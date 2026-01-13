@@ -39,6 +39,8 @@ type Configs struct {
 		AllowServerList bool `toml:"allow-server-list"`
 
 		ServerIcon string `toml:"server-icon"`
+
+		RSAKeyBits int `toml:"rsa-key-bits"`
 	} `toml:"Proprieties"`
 }
 
@@ -63,6 +65,7 @@ func ReadConfigurationFile() (Configs, error) {
 		}
 		return Configs{}, err
 	}
+	defer content.Close()
 
 	decoder := toml.NewDecoder(content)
 
@@ -85,6 +88,7 @@ func DefaultValuesForServerConfig() Configs {
 	cfg.Proprieties.MaxPlayers = 20
 	cfg.Proprieties.LevelSeed = ""
 	cfg.Proprieties.AllowServerList = true
+	cfg.Proprieties.RSAKeyBits = 2048
 
 	return cfg
 }
