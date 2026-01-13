@@ -7,6 +7,8 @@ import (
 	"MoonMS/internal/offline"
 	"MoonMS/internal/packets"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/x509"
@@ -34,6 +36,10 @@ const TRUE_VALUE byte = 0x01
 const FALSE_VALUE byte = 0x00
 
 const MOJANG_SESSION_CHECKER = `https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s`
+
+type MojangAnswer struct {
+	Properties []map[string]string
+}
 
 func logInfo(args ...any) {
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
@@ -124,10 +130,6 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	var sharedSecret []byte
-
-	clientAddr := conn.RemoteAddr().String()
-
-	logInfo(fmt.Sprintf("Received connection from %s", clientAddr))
 
 	startingData := make([]byte, 2)
 	_, err := conn.Read(startingData)
@@ -260,6 +262,7 @@ func handleConnection(conn net.Conn) {
 		tmp = 0
 
 		playerName := buf[offset : offset+int(stringLenght)]
+		clientAddr := conn.RemoteAddr().String()
 
 		if CFG.Proprieties.OnlineMode {
 			playerUUID, err := uuid.FromBytes(buf[offset+int(stringLenght):])
@@ -267,6 +270,7 @@ func handleConnection(conn net.Conn) {
 				logError(err)
 				return
 			}
+			logInfo(fmt.Sprintf("Received connection from %s  %s (%s)", clientAddr, string(playerName), playerUUID.String()))
 
 			packetID := datatypes.WriteVarInt(packets.PACKET_ENCRYPTION_REQUEST)
 
@@ -390,7 +394,6 @@ func handleConnection(conn net.Conn) {
 				logError(err)
 				return
 			}
-			fmt.Println(sharedSecret)
 
 			hash := sha1.New()
 			hash.Write(serverID)
@@ -400,13 +403,13 @@ func handleConnection(conn net.Conn) {
 			sum := hash.Sum(nil)
 
 			var resp *http.Response
-			for i := 0; i < 5; i++ {
+			for i := range 10 {
 				resp, err = http.Get(fmt.Sprintf(MOJANG_SESSION_CHECKER, string(playerName), hex.EncodeToString(sum)))
 				if err != nil {
 					logError(err)
 					return
 				}
-				if resp.StatusCode != 200 && i == 4 {
+				if resp.StatusCode != 200 && i == 9 {
 					defer resp.Body.Close()
 					payload, err := packets.DisconnectLogin("Invalid session")
 					if err != nil {
@@ -414,6 +417,7 @@ func handleConnection(conn net.Conn) {
 						return
 					}
 					conn.Write(payload)
+					logError("Mojang didn't responded player check for the 10th time in 10 secods")
 					return
 				}
 				if resp.StatusCode != 200 {
@@ -430,9 +434,86 @@ func handleConnection(conn net.Conn) {
 				logError(err)
 				return
 			}
-			fmt.Println(string(mojangPayload))
 
-			fmt.Println(playerUUID.String())
+			var mojangResponse MojangAnswer
+			if err := json.Unmarshal(mojangPayload, &mojangResponse); err != nil {
+				logError(err)
+				return
+			}
+
+			var name string
+			var value string
+			var signature string
+
+			for _, v := range mojangResponse.Properties {
+				if _, exists := v["name"]; exists {
+					name = v["name"]
+				}
+				if _, exists := v["value"]; exists {
+					value = v["value"]
+				}
+				if _, exists := v["signature"]; exists {
+					signature = v["signature"]
+				}
+			}
+
+			totalLenght = 0
+			packetID = datatypes.WriteVarInt(packets.PACKET_LOGIN_SUCCESS)
+			totalLenght += len(packetID)
+
+			binUUUID, err := playerUUID.MarshalBinary()
+			if err != nil {
+				logError(err)
+				return
+			}
+			totalLenght += len(binUUUID)
+
+			playerNameLenght := datatypes.WriteVarInt(int32(len(playerName)))
+			totalLenght += len(playerNameLenght) + len(playerName)
+
+			arrayEntryPoint := datatypes.WriteVarInt(1)
+			totalLenght += len(arrayEntryPoint)
+
+			nameLenght := datatypes.WriteVarInt(int32(len([]byte(name))))
+			totalLenght += len(nameLenght) + len([]byte(name))
+
+			valueLenght := datatypes.WriteVarInt(int32(len([]byte(value))))
+			totalLenght += len(valueLenght) + len([]byte(value))
+
+			signatureLenght := datatypes.WriteVarInt(int32(len([]byte(signature))))
+			totalLenght += len(signatureLenght) + len([]byte(signature))
+
+			totalLenght += 1 // bool signature value
+			lenght = datatypes.WriteVarInt(int32(totalLenght))
+
+			response = make([]byte, totalLenght+len(lenght))
+
+			offset = copy(response, lenght)
+			offset += copy(response[offset:], packetID)
+			offset += copy(response[offset:], binUUUID)
+			offset += copy(response[offset:], playerNameLenght)
+			offset += copy(response[offset:], playerName)
+			offset += copy(response[offset:], arrayEntryPoint)
+			offset += copy(response[offset:], nameLenght)
+			offset += copy(response[offset:], []byte(name))
+			offset += copy(response[offset:], valueLenght)
+			offset += copy(response[offset:], []byte(value))
+			offset += copy(response[offset:], []byte{TRUE_VALUE})
+			offset += copy(response[offset:], signatureLenght)
+			copy(response[offset:], []byte(signature))
+
+			fmt.Println(totalLenght)
+			block, err := aes.NewCipher(sharedSecret)
+			if err != nil {
+				logError(err)
+				return
+			}
+
+			encrypter := cipher.NewCTR(block, sharedSecret)
+
+			responseCipher := make([]byte, len(response))
+			encrypter.XORKeyStream(responseCipher, response)
+			conn.Write(responseCipher)
 
 		} else {
 
@@ -463,7 +544,6 @@ func handleConnection(conn net.Conn) {
 			copy(response[offset:], proprieties)
 
 			conn.Write(response)
-
 		}
 
 	}
