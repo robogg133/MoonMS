@@ -1,7 +1,7 @@
 package packets
 
 import (
-	datatypes "MoonMS/internal/datatypes/varTypes"
+	"MoonMS/internal/datatypes"
 	"encoding/json"
 )
 
@@ -11,7 +11,7 @@ type Text struct {
 
 func DisconnectLogin(reason any) ([]byte, error) {
 
-	packetID := datatypes.WriteVarInt(PACKET_LOGIN_DISCONNECT)
+	packetID := datatypes.NewVarInt(int32(PACKET_LOGIN_DISCONNECT))
 
 	var txt Text
 
@@ -22,13 +22,12 @@ func DisconnectLogin(reason any) ([]byte, error) {
 		return nil, err
 	}
 
-	reasonLenght := datatypes.WriteVarInt(int32(len(reasonPayload)))
+	reasonLenght := datatypes.NewVarInt(int32(len(reasonPayload)))
+	var totalLenght int32 = int32(len(packetID) + len(reasonLenght) + len(reasonPayload))
 
-	totalLenght := len(packetID) + len(reasonLenght) + len(reasonPayload)
+	lenght := datatypes.NewVarInt(totalLenght)
 
-	lenght := datatypes.WriteVarInt(int32(totalLenght))
-
-	disconnectPacket := make([]byte, totalLenght+len(lenght))
+	disconnectPacket := make([]byte, totalLenght+int32(len(lenght)))
 
 	offset := copy(disconnectPacket, lenght)
 	offset += copy(disconnectPacket[offset:], packetID)

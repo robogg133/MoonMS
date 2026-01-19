@@ -41,6 +41,8 @@ type Configs struct {
 		ServerIcon string `toml:"server-icon"`
 
 		RSAKeyBits int `toml:"rsa-key-bits"`
+
+		ServerThreshold int32 `toml:"server-threshold"`
 	} `toml:"Proprieties"`
 }
 
@@ -89,6 +91,6 @@ func DefaultValuesForServerConfig() Configs {
 	cfg.Proprieties.LevelSeed = ""
 	cfg.Proprieties.AllowServerList = true
 	cfg.Proprieties.RSAKeyBits = 2048
-
+	cfg.Proprieties.ServerThreshold = 256
 	return cfg
 }

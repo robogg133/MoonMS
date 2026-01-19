@@ -1,9 +1,10 @@
 package main
 
 import (
+	"MoonMS/cmd/server/compress"
 	"MoonMS/cmd/server/config"
 	"MoonMS/cmd/server/crypto"
-	datatypes "MoonMS/internal/datatypes/varTypes"
+	"MoonMS/internal/datatypes"
 	"MoonMS/internal/offline"
 	"MoonMS/internal/packets"
 	"bytes"
@@ -32,10 +33,8 @@ import (
 var PROTOCOL_VERSION uint16 = 774
 var CURRENT_VERSION string = "1.21.11"
 
-const TRUE_VALUE byte = 0x01
-const FALSE_VALUE byte = 0x00
-
 const MOJANG_SESSION_CHECKER = `https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s`
+const DEADLINE = time.Second * 30
 
 type MojangAnswer struct {
 	Properties []map[string]string
@@ -63,6 +62,33 @@ func logFatal(args ...any) {
 var CFG config.Configs
 
 var AnonymousPlayer = &packets.PlayerMinimunInfo{Username: "Anonymous Player", UUID: "00000000-0000-0000-0000-000000000000"}
+
+func CheckFilesToStart() error {
+	_, err := os.Stat("banned-ips.txt")
+	if err != nil {
+		if os.IsNotExist(err) {
+			f, err := os.Create("banned-ips.txt")
+			if err != nil {
+
+				return err
+			}
+			f.Close()
+
+		}
+	}
+	_, err = os.Stat("banned-accounts.txt")
+	if err != nil {
+		if os.IsNotExist(err) {
+			f, err := os.Create("banned-accounts.txt")
+			if err != nil {
+				logError(err)
+				return
+			}
+			f.Close()
+
+		}
+	}
+}
 
 func main() {
 
@@ -109,6 +135,31 @@ func main() {
 
 	}
 
+	_, err = os.Stat("banned-ips.txt")
+	if err != nil {
+		if os.IsNotExist(err) {
+			f, err := os.Create("banned-ips.txt")
+			if err != nil {
+				logError(err)
+				return
+			}
+			f.Close()
+
+		}
+	}
+	_, err = os.Stat("banned-accounts.txt")
+	if err != nil {
+		if os.IsNotExist(err) {
+			f, err := os.Create("banned-accounts.txt")
+			if err != nil {
+				logError(err)
+				return
+			}
+			f.Close()
+
+		}
+	}
+
 	logInfo(fmt.Sprintf("Starting java tcp listener on port %d", CFG.Proprieties.ServerPort))
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", CFG.Proprieties.ServerPort))
 	if err != nil {
@@ -151,7 +202,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	buff := bytes.NewBuffer(buf)
-	n, readed, err := datatypes.ReadVarInt(buff)
+	n, readed, err := datatypes.ParseVarInt(buff)
 	if err != nil {
 		logError(err)
 	}
@@ -165,7 +216,7 @@ func handleConnection(conn net.Conn) {
 
 	// port := binary.BigEndian.Uint16(buf[stringOffset : stringOffset+2])
 
-	intention, _, err := datatypes.ReadVarInt(bytes.NewBuffer(buf[stringOffset+2:]))
+	intention, _, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[stringOffset+2:]))
 
 	switch intention {
 	case 1:
@@ -204,12 +255,12 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 		lenghtForResponse := len(statusSerialized)
-		lenghtForResponsePayload := datatypes.WriteVarInt(int32(len(statusSerialized)))
-		packageID := datatypes.WriteVarInt(packets.PACKET_HANDSHAKE)
+		lenghtForResponsePayload := datatypes.NewVarInt(int32(len(statusSerialized)))
+		packageID := datatypes.NewVarInt(packets.PACKET_HANDSHAKE)
 
 		totalLenght := len(packageID) + lenghtForResponse + len(lenghtForResponsePayload)
 
-		packageLenght := datatypes.WriteVarInt(int32(totalLenght))
+		packageLenght := datatypes.NewVarInt(int32(totalLenght))
 
 		response := make([]byte, len(packageLenght)+totalLenght)
 
@@ -222,6 +273,10 @@ func handleConnection(conn net.Conn) {
 		conn.Write(response)
 
 	case 2:
+
+		Deadline := time.Now().Add(DEADLINE)
+		conn.SetReadDeadline(Deadline)
+
 		initialPayload := make([]byte, 512)
 		n, err := conn.Read(initialPayload)
 		if err != nil {
@@ -233,13 +288,13 @@ func handleConnection(conn net.Conn) {
 		copy(buf, initialPayload[:n])
 		initialPayload = nil
 
-		_, offset, err := datatypes.ReadVarInt(bytes.NewReader(buf))
+		_, offset, err := datatypes.ParseVarInt(bytes.NewReader(buf))
 		if err != nil {
 			logError(err)
 			return
 		}
 
-		protocolID, tmp, err := datatypes.ReadVarInt(bytes.NewReader(buf[offset:]))
+		protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 		if err != nil {
 			logError(err)
 			return
@@ -252,7 +307,7 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		stringLenght, tmp, err := datatypes.ReadVarInt(bytes.NewReader(buf[offset:]))
+		stringLenght, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 		if err != nil {
 			logError(err)
 			return
@@ -270,47 +325,46 @@ func handleConnection(conn net.Conn) {
 				logError(err)
 				return
 			}
-			logInfo(fmt.Sprintf("Received connection from %s  %s (%s)", clientAddr, string(playerName), playerUUID.String()))
+			logInfo(fmt.Sprintf("Received connection from %s as %s (%s)", clientAddr, string(playerName), playerUUID.String()))
 
-			packetID := datatypes.WriteVarInt(packets.PACKET_ENCRYPTION_REQUEST)
+			packetID := datatypes.NewVarInt(int32(packets.PACKET_ENCRYPTION_REQUEST))
 
 			serverID := []byte("")
-			serverIDPrefix := datatypes.WriteVarInt(int32(len(serverID)))
+			serverIDPrefix := datatypes.NewVarInt(int32(len(serverID)))
 
 			publicKeyMarshal, err := os.ReadFile("server-public.key")
 			if err != nil {
 				logError(err)
 				return
 			}
-			publicKeyMarshalPrefix := datatypes.WriteVarInt(int32(len(publicKeyMarshal)))
+			publicKeyMarshalPrefix := datatypes.NewVarInt(int32(len(publicKeyMarshal)))
 
 			verifyToken := make([]byte, 4)
 			rand.Read(verifyToken)
-			verifyTokenPrefix := datatypes.WriteVarInt(4)
+			verifyTokenPrefix := datatypes.NewVarInt(4)
 
-			var shouldAuth byte
-			shouldAuth = TRUE_VALUE
+			shouldAuth := datatypes.NewBoolean(true)
 
 			totalLenght := len(packetID) + len(serverIDPrefix) + len(serverID) + len(publicKeyMarshalPrefix) + len(publicKeyMarshal) + len(verifyTokenPrefix) + len(verifyToken) + 1 // +1 for shouldAuth
-			lenght := datatypes.WriteVarInt(int32(totalLenght))
+			lenght := datatypes.NewVarInt(int32(totalLenght))
 
-			response := make([]byte, totalLenght+len(lenght))
+			var responseBuffer bytes.Buffer
 
-			offset := copy(response, lenght)
-			offset += copy(response[offset:], packetID)
+			responseBuffer.Write(lenght)
+			responseBuffer.Write(packetID)
 
-			offset += copy(response[offset:], serverIDPrefix)
-			offset += copy(response[offset:], serverID)
+			responseBuffer.Write(serverIDPrefix)
+			responseBuffer.Write(serverID)
 
-			offset += copy(response[offset:], publicKeyMarshalPrefix)
-			offset += copy(response[offset:], publicKeyMarshal)
+			responseBuffer.Write(publicKeyMarshalPrefix)
+			responseBuffer.Write(publicKeyMarshal)
 
-			offset += copy(response[offset:], verifyTokenPrefix)
-			copy(response[offset:], verifyToken)
+			responseBuffer.Write(verifyTokenPrefix)
+			responseBuffer.Write(verifyToken)
 
-			response[len(response)-1] = shouldAuth
-
-			conn.Write(response)
+			responseBuffer.WriteByte(byte(shouldAuth))
+			conn.Write(responseBuffer.Bytes())
+			responseBuffer.Reset()
 
 			initialPayload := make([]byte, 4096)
 			n, err := conn.Read(initialPayload)
@@ -322,25 +376,31 @@ func handleConnection(conn net.Conn) {
 			copy(buf, initialPayload[:n])
 			initialPayload = nil
 
-			_, offset, err = datatypes.ReadVarInt(bytes.NewReader(buf))
+			compressionStartPkg := &packets.CompressionStart{
+				Threshould: CFG.Proprieties.ServerThreshold,
+			}
+
+			conn.Write(compressionStartPkg.Serialize())
+
+			_, offset, err = datatypes.ParseVarInt(bytes.NewReader(buf))
 			if err != nil {
 				logError(err)
 				return
 			}
 
-			protocolID, tmp, err := datatypes.ReadVarInt(bytes.NewReader(buf[offset:]))
+			protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 			if err != nil {
 				logError(err)
 				return
 			}
 			offset += tmp
 
-			if protocolID != packets.PACKET_ENCRYPTION_RESPONSE {
+			if byte(protocolID) != packets.PACKET_ENCRYPTION_RESPONSE {
 				logError("Player failed to answer encryption response")
 				return
 			}
 
-			sharedSecretLenght, tmp, err := datatypes.ReadVarInt(bytes.NewBuffer(buf[offset:]))
+			sharedSecretLenght, tmp, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[offset:]))
 			if err != nil {
 				logError(err)
 				return
@@ -352,9 +412,12 @@ func handleConnection(conn net.Conn) {
 
 			copy(sharedSecretCipher, buf[offset:offset+int(sharedSecretLenght)])
 
-			verifyTokenLenght, tmp, err := datatypes.ReadVarInt(bytes.NewBuffer(buf[offset+int(sharedSecretLenght):]))
-
-			offset = offset + int(sharedSecretLenght) + tmp
+			verifyTokenLenght, tmp, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[offset+int(sharedSecretLenght):]))
+			if err != nil {
+				logError(err)
+				return
+			}
+			offset += int(sharedSecretLenght) + tmp
 
 			verifyTokenClientCiphered := make([]byte, verifyTokenLenght)
 			copy(verifyTokenClientCiphered, buf[offset:offset+int(verifyTokenLenght)])
@@ -417,15 +480,12 @@ func handleConnection(conn net.Conn) {
 						return
 					}
 					conn.Write(payload)
-					logError("Mojang didn't responded player check for the 10th time in 10 secods")
-					return
 				}
 				if resp.StatusCode != 200 {
 					resp.Body.Close()
 				} else {
 					break
 				}
-				time.Sleep(1 * time.Second)
 			}
 			defer resp.Body.Close()
 
@@ -457,52 +517,22 @@ func handleConnection(conn net.Conn) {
 				}
 			}
 
-			totalLenght = 0
-			packetID = datatypes.WriteVarInt(packets.PACKET_LOGIN_SUCCESS)
-			totalLenght += len(packetID)
+			var loginSuccesspkg packets.LoginSuccessPacket
+			var namebuff bytes.Buffer
 
-			binUUUID, err := playerUUID.MarshalBinary()
+			namebuff.Write(datatypes.NewVarInt(int32(len(playerName))))
+			namebuff.Write(playerName)
+			loginSuccesspkg.Profile.Username = datatypes.String(namebuff.Bytes())
+			namebuff.Reset()
+			loginSuccesspkg.Profile.UUID, err = playerUUID.MarshalBinary()
 			if err != nil {
 				logError(err)
 				return
 			}
-			totalLenght += len(binUUUID)
-
-			playerNameLenght := datatypes.WriteVarInt(int32(len(playerName)))
-			totalLenght += len(playerNameLenght) + len(playerName)
-
-			arrayEntryPoint := datatypes.WriteVarInt(1)
-			totalLenght += len(arrayEntryPoint)
-
-			nameLenght := datatypes.WriteVarInt(int32(len([]byte(name))))
-			totalLenght += len(nameLenght) + len([]byte(name))
-
-			valueLenght := datatypes.WriteVarInt(int32(len([]byte(value))))
-			totalLenght += len(valueLenght) + len([]byte(value))
-
-			signatureLenght := datatypes.WriteVarInt(int32(len([]byte(signature))))
-			totalLenght += len(signatureLenght) + len([]byte(signature))
-
-			totalLenght += 1 // bool signature value
-			lenght = datatypes.WriteVarInt(int32(totalLenght))
-
-			response = make([]byte, totalLenght+len(lenght))
-
-			offset = copy(response, lenght)
-			offset += copy(response[offset:], packetID)
-			offset += copy(response[offset:], binUUUID)
-			offset += copy(response[offset:], playerNameLenght)
-			offset += copy(response[offset:], playerName)
-			offset += copy(response[offset:], arrayEntryPoint)
-			offset += copy(response[offset:], nameLenght)
-			offset += copy(response[offset:], []byte(name))
-			offset += copy(response[offset:], valueLenght)
-			offset += copy(response[offset:], []byte(value))
-			offset += copy(response[offset:], []byte{TRUE_VALUE})
-			offset += copy(response[offset:], signatureLenght)
-			copy(response[offset:], []byte(signature))
-
-			fmt.Println(totalLenght)
+			loginSuccesspkg.Profile.Name = name
+			loginSuccesspkg.Profile.Value = value
+			loginSuccesspkg.Profile.HaveSignature = true
+			loginSuccesspkg.Profile.Signature = signature
 			block, err := aes.NewCipher(sharedSecret)
 			if err != nil {
 				logError(err)
@@ -510,44 +540,74 @@ func handleConnection(conn net.Conn) {
 			}
 
 			encrypter := cipher.NewCTR(block, sharedSecret)
-
-			responseCipher := make([]byte, len(response))
-			encrypter.XORKeyStream(responseCipher, response)
-			conn.Write(responseCipher)
-
-		} else {
-
-			playerUUID := offline.NameToUUID(string(playerName))
-
-			proprieties := datatypes.WriteVarInt(0)
-
-			packetID := datatypes.WriteVarInt(packets.PACKET_LOGIN_SUCCESS)
-
-			binaryUUID, err := playerUUID.MarshalBinary()
+			tmpBuff, err := compress.Compress(loginSuccesspkg.Serialize(), CFG.Proprieties.ServerThreshold)
 			if err != nil {
 				logError(err)
 				return
 			}
 
-			stringSize := datatypes.WriteVarInt(int32(len(playerName)))
+			responseCipher := make([]byte, len(tmpBuff))
+			encrypter.XORKeyStream(responseCipher, tmpBuff)
+			conn.Write(responseCipher)
+			tmpBuff = nil
+			fmt.Println("sent everything")
 
-			totalLenght := len(packetID) + len(binaryUUID) + len(stringSize) + len(playerName) + len(proprieties)
-			lenght := datatypes.WriteVarInt(int32(totalLenght))
+			aknowledge := make([]byte, 3)
+			_, err = conn.Read(aknowledge)
+			if err != nil {
+				return
+			}
+			fmt.Println(aknowledge)
 
-			response := make([]byte, totalLenght+len(lenght))
+		} else {
 
-			offset := copy(response, lenght)
-			offset += copy(response[offset:], packetID)
-			offset += copy(response[offset:], binaryUUID)
-			offset += copy(response[offset:], stringSize)
-			offset += copy(response[offset:], playerName)
-			copy(response[offset:], proprieties)
+			compressionStartPkg := &packets.CompressionStart{
+				Threshould: CFG.Proprieties.ServerThreshold,
+			}
 
-			conn.Write(response)
+			conn.Write(compressionStartPkg.Serialize())
+
+			playerUUID := offline.NameToUUID(string(playerName))
+
+			logInfo(fmt.Sprintf("Received connection from %s as %s (%s) [OFFLINE]", clientAddr, string(playerName), playerUUID.String()))
+			var loginSuccesspkg packets.LoginSuccessPacket
+			var namebuff bytes.Buffer
+
+			namebuff.Write(datatypes.NewVarInt(int32(len(playerName))))
+			namebuff.Write(playerName)
+			loginSuccesspkg.Profile.Username = datatypes.String(namebuff.Bytes())
+			namebuff.Reset()
+			loginSuccesspkg.Profile.UUID, err = playerUUID.MarshalBinary()
+			if err != nil {
+				logError(err)
+				return
+			}
+
+			response := loginSuccesspkg.Serialize()
+
+			compressedResponse, err := compress.Compress(response, CFG.Proprieties.ServerThreshold)
+			if err != nil {
+				logError(err)
+				return
+			}
+
+			conn.Write(compressedResponse)
+
+			aknowledge := make([]byte, 3)
+			_, err = conn.Read(aknowledge)
+			if err != nil {
+				return
+			}
+
+			if aknowledge[2] != byte(packets.PACKET_LOGIN_AKNOWLEDGED) {
+				logError("Invalid packet")
+				return
+			}
 		}
 
 	}
 
+	conn.SetReadDeadline(time.Time{})
 	for {
 		innerBuffer := make([]byte, 4096)
 		n, err := conn.Read(innerBuffer)
@@ -565,12 +625,12 @@ func handleConnection(conn net.Conn) {
 		copy(buf, innerBuffer[:n])
 		innerBuffer = nil
 
-		packetLenght, offset, err := datatypes.ReadVarInt(bytes.NewReader(buf))
+		packetLenght, offset, err := datatypes.ParseVarInt(bytes.NewReader(buf))
 		if err != nil {
 			logError(err)
 		}
 
-		protocolID, tmp, err := datatypes.ReadVarInt(bytes.NewReader(buf[offset:]))
+		protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 		if err != nil {
 			logError(err)
 		}
@@ -578,10 +638,25 @@ func handleConnection(conn net.Conn) {
 		tmp = 0
 
 		switch {
-		case protocolID == packets.PACKET_PING && packetLenght == 10:
+		case protocolID == int32(packets.PACKET_PING) && packetLenght == 10:
 			conn.Write(packets.SerializePong(buf[offset:]))
 		}
 	}
+}
+
+func isConnAlive(conn net.Conn, makeDeadline time.Time) bool {
+	conn.SetReadDeadline(time.Now())
+	defer conn.SetReadDeadline(makeDeadline)
+
+	zero := make([]byte, 0)
+	_, err := conn.Read(zero)
+
+	if err == nil {
+		return true
+	}
+
+	return false
+
 }
 
 func GetBase64Image(path string) (string, error) {

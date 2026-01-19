@@ -1,13 +1,11 @@
 package packets
 
-import (
-	vartypes "MoonMS/internal/datatypes/varTypes"
-)
+import "MoonMS/internal/datatypes"
 
 func SerializePong(num []byte) []byte {
 
-	protocolID := vartypes.WriteVarInt(PACKET_PONG)
-	packetLenght := vartypes.WriteVarInt(int32(len(protocolID) + len(num)))
+	protocolID := datatypes.NewVarInt(int32(PACKET_PONG))
+	packetLenght := datatypes.NewVarInt(int32(len(protocolID) + len(num)))
 
 	response := make([]byte, 10)
 
