@@ -81,22 +81,11 @@ func CheckFilesToStart() error {
 		if os.IsNotExist(err) {
 			f, err := os.Create("banned-accounts.txt")
 			if err != nil {
-				logError(err)
-				return
+				return err
 			}
 			f.Close()
 
 		}
-	}
-}
-
-func main() {
-
-	logInfo("Reading main configuration file")
-	var err error
-	CFG, err = config.ReadConfigurationFile()
-	if err != nil {
-		logFatal(err)
 	}
 
 	if _, err = os.Stat("server-private-key.pem"); err != nil {
@@ -135,32 +124,24 @@ func main() {
 
 	}
 
-	_, err = os.Stat("banned-ips.txt")
-	if err != nil {
-		if os.IsNotExist(err) {
-			f, err := os.Create("banned-ips.txt")
-			if err != nil {
-				logError(err)
-				return
-			}
-			f.Close()
+	return nil
+}
 
-		}
-	}
-	_, err = os.Stat("banned-accounts.txt")
-	if err != nil {
-		if os.IsNotExist(err) {
-			f, err := os.Create("banned-accounts.txt")
-			if err != nil {
-				logError(err)
-				return
-			}
-			f.Close()
+func main() {
 
-		}
+	logInfo("Reading main configuration file")
+	var err error
+	CFG, err = config.ReadConfigurationFile()
+	if err != nil {
+		logFatal(err)
 	}
 
-	logInfo(fmt.Sprintf("Starting java tcp listener on port %d", CFG.Proprieties.ServerPort))
+	if err := CheckFilesToStart(); err != nil {
+		logError(err)
+		return
+	}
+
+	logInfo(fmt.Sprintf("Starting minecraft java edittion tcp listener on port %d", CFG.Proprieties.ServerPort))
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", CFG.Proprieties.ServerPort))
 	if err != nil {
 		logFatal(err)
@@ -182,27 +163,19 @@ func handleConnection(conn net.Conn) {
 
 	var sharedSecret []byte
 
-	startingData := make([]byte, 2)
-	_, err := conn.Read(startingData)
+	buff, err := ReadPackageFromConnecion(conn)
 	if err != nil {
 		logError(err)
 		return
 	}
 
-	if startingData[1] != packets.PACKET_HANDSHAKE {
-		logError("The player don't started the connection with a handshake")
+	_, err = conn.Read(buff)
+	if err != nil {
+		logError(err)
 		return
 	}
 
-	buf := make([]byte, uint8(startingData[0])-1)
-
-	_, err = conn.Read(buf)
-	if err != nil {
-		logError(err)
-	}
-
-	buff := bytes.NewBuffer(buf)
-	n, readed, err := datatypes.ParseVarInt(buff)
+	n, readed, err := datatypes.ParseVarInt(bytes.NewBuffer(buff))
 	if err != nil {
 		logError(err)
 	}
@@ -210,21 +183,27 @@ func handleConnection(conn net.Conn) {
 		logError("Mismatched version from the client")
 		return
 	}
-	stringLenght := uint8(buf[readed])
+	stringLenght := uint8(buff[readed])
 	stringOffset := stringLenght + uint8(readed) + 1
 	// serverAdress := string(buf[readed+1 : stringOffset])
 
 	// port := binary.BigEndian.Uint16(buf[stringOffset : stringOffset+2])
 
-	intention, _, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[stringOffset+2:]))
+	intention, _, err := datatypes.ParseVarInt(bytes.NewBuffer(buff[stringOffset+2:]))
 
 	switch intention {
 	case 1:
-		initialPayload := make([]byte, 2)
-		_, err := conn.Read(initialPayload)
+		statuspkg, err := ReadPackageFromConnecion(conn)
 		if err != nil {
 			logError(err)
+			return
 		}
+
+		if statuspkg[1] != packets.PACKET_HANDSHAKE {
+			logError("mismatched packet id gaved by client")
+			return
+		}
+		statuspkg = nil
 
 		var status packets.HandShakeResponseStatus
 
@@ -262,31 +241,53 @@ func handleConnection(conn net.Conn) {
 
 		packageLenght := datatypes.NewVarInt(int32(totalLenght))
 
-		response := make([]byte, len(packageLenght)+totalLenght)
+		var response bytes.Buffer
+
+		response.Write(packageLenght)
+		response.Write(packageID)
+		response.Write(lenghtForResponsePayload)
+		response.Write(statusSerialized)
+
+		conn.Write(response.Bytes())
+
+		pingPkg := make([]byte, 10)
+
+		conn.Read(pingPkg)
 
 		offset := 0
-		offset += copy(response[offset:], packageLenght)
-		offset += copy(response[offset:], packageID)
-		offset += copy(response[offset:], lenghtForResponsePayload)
-		copy(response[offset:], statusSerialized)
+		_, n, err := datatypes.ParseVarInt(bytes.NewReader(pingPkg))
+		if err != nil {
+			logError(err)
+			return
+		}
 
-		conn.Write(response)
+		offset += n
+
+		pkgID, n, err := datatypes.ParseVarInt(bytes.NewReader(pingPkg[n:]))
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		offset += n
+		n = 0
+
+		if pkgID == packets.PACKET_PING {
+			conn.Write(packets.SerializePong(pingPkg[offset:]))
+		}
+
+		return
 
 	case 2:
 
 		Deadline := time.Now().Add(DEADLINE)
 		conn.SetReadDeadline(Deadline)
 
-		initialPayload := make([]byte, 512)
-		n, err := conn.Read(initialPayload)
+		buf, err := ReadPackageFromConnecion(conn)
 		if err != nil {
 			logError(err)
 			return
 		}
-		buf := make([]byte, n)
-
-		copy(buf, initialPayload[:n])
-		initialPayload = nil
 
 		_, offset, err := datatypes.ParseVarInt(bytes.NewReader(buf))
 		if err != nil {
@@ -363,18 +364,16 @@ func handleConnection(conn net.Conn) {
 			responseBuffer.Write(verifyToken)
 
 			responseBuffer.WriteByte(byte(shouldAuth))
+
+			//Sending encryption request
 			conn.Write(responseBuffer.Bytes())
 			responseBuffer.Reset()
 
-			initialPayload := make([]byte, 4096)
-			n, err := conn.Read(initialPayload)
+			buf, err := ReadPackageFromConnecion(conn)
 			if err != nil {
 				logError(err)
+				return
 			}
-			buf := make([]byte, n)
-
-			copy(buf, initialPayload[:n])
-			initialPayload = nil
 
 			compressionStartPkg := &packets.CompressionStart{
 				Threshould: CFG.Proprieties.ServerThreshold,
@@ -395,7 +394,7 @@ func handleConnection(conn net.Conn) {
 			}
 			offset += tmp
 
-			if byte(protocolID) != packets.PACKET_ENCRYPTION_RESPONSE {
+			if protocolID != packets.PACKET_ENCRYPTION_RESPONSE {
 				logError("Player failed to answer encryption response")
 				return
 			}
@@ -609,38 +608,7 @@ func handleConnection(conn net.Conn) {
 
 	conn.SetReadDeadline(time.Time{})
 	for {
-		innerBuffer := make([]byte, 4096)
-		n, err := conn.Read(innerBuffer)
-		if err != nil {
-			if err == io.EOF {
-				continue
-			}
-			logError(err)
-		}
-		if n == 0 {
-			continue
-		}
-
-		buf := make([]byte, n)
-		copy(buf, innerBuffer[:n])
-		innerBuffer = nil
-
-		packetLenght, offset, err := datatypes.ParseVarInt(bytes.NewReader(buf))
-		if err != nil {
-			logError(err)
-		}
-
-		protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
-		if err != nil {
-			logError(err)
-		}
-		offset += tmp
-		tmp = 0
-
-		switch {
-		case protocolID == int32(packets.PACKET_PING) && packetLenght == 10:
-			conn.Write(packets.SerializePong(buf[offset:]))
-		}
+		time.Sleep(5 * time.Second)
 	}
 }
 
