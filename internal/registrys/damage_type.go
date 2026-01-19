@@ -1,0 +1,31 @@
+package registrys
+
+const REGISTRY_DAMAGE string = "minecraft:damage_type"
+
+const (
+	DAMAGE_CACUTS           = "minecraft:cactus"
+	DAMAGE_CAMPFIRE         = "minecraft:campfire"
+	DAMAGE_CRAMMING         = "minecraft:cramming"
+	DAMAGE_DRAGON_BREATH    = "minecraft:dragon_breath"
+	DAMAGE_DROWN            = "minecraft:drown"
+	DAMAGE_DRY_OUT          = "minecraft:dry_out"
+	DAMAGE_ENDER_PEARL      = "minecraft:ender_pearl"
+	DAMAGE_FALL             = "minecraft:fall"
+	DAMAGE_FLY_INTO_WALL    = "minecraft:fly_into_wall"
+	DAMAGE_FREEZE           = "minecraft:freeze"
+	DAMAGE_GENERIC          = "minecraft:generic"
+	DAMAGE_GENERIC_KILL     = "minecraft:generic_kill"
+	DAMAGE_HOT_FLOOR        = "minecraft:hot_floor"
+	DAMAGE_IN_FIRE          = "minecraft:in_fire"
+	DAMAGE_IN_WALL          = "minecraft:in_wall"
+	DAMAGE_LAVA             = "minecraft:lava"
+	DAMAGE_LIGHTNING_BOLT   = "minecraft:lightning_bolt"
+	DAMAGE_MAGIC            = "minecraft:magic"
+	DAMAGE_ON_FIRE          = "minecraft:on_fire"
+	DAMAGE_OUT_OF_WORLD     = "minecraft:out_of_world"
+	DAMAGE_OUTSIDE_BORDER   = "minecraft:outside_border"
+	DAMAGE_STALAGMITE       = "minecraft:stalagmite"
+	DAMAGE_STARVE           = "minecraft:starve"
+	DAMAGE_SWEET_BERRY_BUSH = "minecraft:sweet_berry_bush"
+	DAMAGE_WITHER           = "minecraft:wither"
+)
