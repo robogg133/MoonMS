@@ -2,12 +2,14 @@ package main
 
 import (
 	"MoonMS/cmd/server/compress"
-	"MoonMS/cmd/server/config"
 	"MoonMS/cmd/server/crypto"
 	"MoonMS/internal/datatypes"
 	"MoonMS/internal/offline"
 	"MoonMS/internal/packets"
+	"MoonMS/internal/plugins"
+	"MoonMS/internal/server"
 	"bytes"
+	"compress/gzip"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -19,19 +21,20 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"sync"
 	"time"
 
 	_ "embed"
 
 	"github.com/google/uuid"
 )
-
-var PROTOCOL_VERSION uint16 = 774
-var CURRENT_VERSION string = "1.21.11"
 
 const MOJANG_SESSION_CHECKER = `https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s`
 const DEADLINE = time.Second * 30
@@ -40,30 +43,15 @@ type MojangAnswer struct {
 	Properties []map[string]string
 }
 
-func logInfo(args ...any) {
-	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
-	fmt.Printf("[%s] \033[34m[INFO]:\033[0m %v\n", timestamp, message)
-}
-
-func logError(args ...any) {
-	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
-	fmt.Printf("[%s] \033[31m[ERROR]:\033[0m %v\n", timestamp, message)
-}
-
-func logFatal(args ...any) {
-	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
-	fmt.Printf("[%s] \033[31m[FATAL]:\033[0m %v\n", timestamp, message)
-	os.Exit(1)
-}
-
-var CFG config.Configs
-
 var AnonymousPlayer = &packets.PlayerMinimunInfo{Username: "Anonymous Player", UUID: "00000000-0000-0000-0000-000000000000"}
 
+var ServerData *server.ServerData
+
 func CheckFilesToStart() error {
+
+	_ = os.Mkdir("plugins", 0755)
+	_ = os.Mkdir("logs", 0755)
+
 	_, err := os.Stat("banned-ips.txt")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -90,30 +78,30 @@ func CheckFilesToStart() error {
 
 	if _, err = os.Stat("server-private-key.pem"); err != nil {
 		if os.IsNotExist(err) {
-			logInfo("Generating server key pair")
-			if err := crypto.GenerateKeyPair(CFG.Proprieties.RSAKeyBits); err != nil {
-				logFatal(err)
+			server.LogInfo("Generating server key pair")
+			if err := crypto.GenerateKeyPair(ServerData.RSAKeyBits); err != nil {
+				server.LogFatal(err)
 			}
 		}
 	} else {
 		if _, err = os.Stat("server-public.key"); err != nil {
 			if os.IsNotExist(err) {
-				logError("Public key don't exist, but private exist, generating another public key from the private key")
+				server.LogError("Public key don't exist, but private exist, generating another public key from the private key")
 				pemKey, err := os.ReadFile("server-private-key.pem")
 				if err != nil {
-					logFatal(err)
+					server.LogFatal(err)
 				}
 				p, _ := pem.Decode(pemKey)
 
 				privateKey, err := x509.ParsePKCS1PrivateKey(p.Bytes)
 				if err != nil {
-					logFatal(err)
+					server.LogFatal(err)
 				}
 				publicKey := privateKey.Public()
 
 				publicKeyMarshalized, err := x509.MarshalPKIXPublicKey(publicKey)
 				if err != nil {
-					logFatal(err)
+					server.LogFatal(err)
 				}
 
 				if err := os.WriteFile("server-public.key", publicKeyMarshalized, 0644); err != nil {
@@ -127,24 +115,96 @@ func CheckFilesToStart() error {
 	return nil
 }
 
+func CompressLog() error {
+
+	oldLog, err := os.Open("logs/latest.log")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer oldLog.Close()
+
+	f, err := os.Create(fmt.Sprintf("logs/%s.gz", time.Now().Format("2006-01-02--15:04:05")))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	writer := gzip.NewWriter(f)
+
+	_, err = io.Copy(writer, oldLog)
+	if err != nil {
+		return err
+	}
+
+	return os.Remove("logs/latest.log")
+}
+
 func main() {
 
-	logInfo("Reading main configuration file")
 	var err error
-	CFG, err = config.ReadConfigurationFile()
-	if err != nil {
-		logFatal(err)
+
+	if err = CompressLog(); err != nil {
+		server.LogError(err)
 	}
 
-	if err := CheckFilesToStart(); err != nil {
-		logError(err)
+	if err = CheckFilesToStart(); err != nil {
+		server.LogError(err)
 		return
 	}
-
-	logInfo(fmt.Sprintf("Starting minecraft java edittion tcp listener on port %d", CFG.Proprieties.ServerPort))
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", CFG.Proprieties.ServerPort))
+	ServerData, err = server.InitServerData()
 	if err != nil {
-		logFatal(err)
+		server.LogFatal(err)
+	}
+
+	if err := filepath.WalkDir("plugins", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			return nil
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+
+		stat, err := f.Stat()
+		if err != nil {
+			return err
+		}
+
+		plugin, err := plugins.ReadPluginFile(f, stat.Size(), path)
+		if err != nil {
+			return err
+		}
+
+		server.LogInfo(fmt.Sprintf("Starting \"%s\"", plugin.Identifier))
+		return plugin.LoadPlugin()
+	}); err != nil {
+		server.LogFatal(err)
+	}
+
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt)
+		<-sig
+
+		var wg sync.WaitGroup
+
+		for _, pl := range *plugins.GetAllPlugins() {
+			wg.Add(1)
+			go pl.RunEventServerStopping(&wg)
+		}
+
+		wg.Wait()
+		os.Exit(0)
+	}()
+
+	server.LogInfo(fmt.Sprintf("Starting minecraft java edittion tcp listener on port %d", ServerData.ServerPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", ServerData.ServerPort))
+	if err != nil {
+		server.LogFatal(err)
 	}
 	defer listener.Close()
 
@@ -163,74 +223,82 @@ func handleConnection(conn net.Conn) {
 
 	var sharedSecret []byte
 
-	buff, err := ReadPackageFromConnecion(conn)
+	startingData := make([]byte, 2)
+	_, err := conn.Read(startingData)
 	if err != nil {
-		logError(err)
+		server.LogError(err)
 		return
 	}
 
-	_, err = conn.Read(buff)
-	if err != nil {
-		logError(err)
+	if startingData[1] != packets.PACKET_HANDSHAKE {
+		server.LogError("The player don't started the connection with a handshake")
 		return
 	}
 
-	n, readed, err := datatypes.ParseVarInt(bytes.NewBuffer(buff))
+	buf := make([]byte, uint8(startingData[0])-1)
+
+	_, err = conn.Read(buf)
 	if err != nil {
-		logError(err)
+		server.LogError(err)
 	}
-	if uint16(n) != PROTOCOL_VERSION {
-		logError("Mismatched version from the client")
+
+	buff := bytes.NewBuffer(buf)
+	n, readed, err := datatypes.ParseVarInt(buff)
+	if err != nil {
+		server.LogError(err)
 		return
 	}
-	stringLenght := uint8(buff[readed])
+	if uint16(n) != ServerData.PROTOCOL_VERSION {
+		server.LogError("Mismatched version from the client")
+	}
+	stringLenght := uint8(buf[readed])
 	stringOffset := stringLenght + uint8(readed) + 1
 	// serverAdress := string(buf[readed+1 : stringOffset])
 
 	// port := binary.BigEndian.Uint16(buf[stringOffset : stringOffset+2])
 
-	intention, _, err := datatypes.ParseVarInt(bytes.NewBuffer(buff[stringOffset+2:]))
+	intention, _, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[stringOffset+2:]))
 
 	switch intention {
 	case 1:
 		statuspkg, err := ReadPackageFromConnecion(conn)
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 
 		if statuspkg[1] != packets.PACKET_HANDSHAKE {
-			logError("mismatched packet id gaved by client")
+			server.LogError("mismatched packet id gaved by client")
 			return
 		}
 		statuspkg = nil
 
 		var status packets.HandShakeResponseStatus
 
-		status.Version.Name = CURRENT_VERSION
-		status.Version.ProtocolVersion = uint16(PROTOCOL_VERSION)
+		status.Version.Name = server.CURRENT_VERSION
+		status.Version.ProtocolVersion = uint16(server.PROTOCOL_VERSION)
 
-		status.Players.MaxPlayers = CFG.Proprieties.MaxPlayers
+		status.Players.MaxPlayers = ServerData.MaxPlayers
 		status.Players.OnlinePlayers = 0
 		status.Players.PlayerStatus = []packets.PlayerMinimunInfo{}
 
-		if CFG.Proprieties.ServerIcon == "" {
+		if ServerData.ServerIcon == "" {
 			status.Favicon = ""
 		} else {
-			status.Favicon, err = GetBase64Image(CFG.Proprieties.ServerIcon)
+			status.Favicon, err = GetBase64Image(ServerData.ServerIcon)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				status.Favicon = ""
 			} else {
 				status.Favicon = fmt.Sprintf("data:image/png;base64,%s", status.Favicon)
 			}
 		}
 
-		status.Description.Text = CFG.Proprieties.Motd
+		status.Description.Text = ServerData.Motd
 
 		statusSerialized, err := json.Marshal(&status)
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 		lenghtForResponse := len(statusSerialized)
@@ -257,7 +325,7 @@ func handleConnection(conn net.Conn) {
 		offset := 0
 		_, n, err := datatypes.ParseVarInt(bytes.NewReader(pingPkg))
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 
@@ -265,7 +333,7 @@ func handleConnection(conn net.Conn) {
 
 		pkgID, n, err := datatypes.ParseVarInt(bytes.NewReader(pingPkg[n:]))
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 
@@ -285,32 +353,32 @@ func handleConnection(conn net.Conn) {
 
 		buf, err := ReadPackageFromConnecion(conn)
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 
 		_, offset, err := datatypes.ParseVarInt(bytes.NewReader(buf))
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 
 		protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 		offset += tmp
 		tmp = 0
 
 		if protocolID != packets.PACKET_HANDSHAKE {
-			logError("Invalid package received from player")
+			server.LogError("Invalid package received from player")
 			return
 		}
 
 		stringLenght, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 		if err != nil {
-			logError(err)
+			server.LogError(err)
 			return
 		}
 
@@ -320,13 +388,13 @@ func handleConnection(conn net.Conn) {
 		playerName := buf[offset : offset+int(stringLenght)]
 		clientAddr := conn.RemoteAddr().String()
 
-		if CFG.Proprieties.OnlineMode {
+		if ServerData.OnlineMode {
 			playerUUID, err := uuid.FromBytes(buf[offset+int(stringLenght):])
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
-			logInfo(fmt.Sprintf("Received connection from %s as %s (%s)", clientAddr, string(playerName), playerUUID.String()))
+			server.LogInfo(fmt.Sprintf("Received connection from %s as %s (%s)", clientAddr, string(playerName), playerUUID.String()))
 
 			packetID := datatypes.NewVarInt(int32(packets.PACKET_ENCRYPTION_REQUEST))
 
@@ -335,7 +403,7 @@ func handleConnection(conn net.Conn) {
 
 			publicKeyMarshal, err := os.ReadFile("server-public.key")
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 			publicKeyMarshalPrefix := datatypes.NewVarInt(int32(len(publicKeyMarshal)))
@@ -371,37 +439,37 @@ func handleConnection(conn net.Conn) {
 
 			buf, err := ReadPackageFromConnecion(conn)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			compressionStartPkg := &packets.CompressionStart{
-				Threshould: CFG.Proprieties.ServerThreshold,
+				Threshould: ServerData.Threshold,
 			}
 
 			conn.Write(compressionStartPkg.Serialize())
 
 			_, offset, err = datatypes.ParseVarInt(bytes.NewReader(buf))
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 			offset += tmp
 
 			if protocolID != packets.PACKET_ENCRYPTION_RESPONSE {
-				logError("Player failed to answer encryption response")
+				server.LogError("Player failed to answer encryption response")
 				return
 			}
 
 			sharedSecretLenght, tmp, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[offset:]))
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 			offset += tmp
@@ -413,7 +481,7 @@ func handleConnection(conn net.Conn) {
 
 			verifyTokenLenght, tmp, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[offset+int(sharedSecretLenght):]))
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 			offset += int(sharedSecretLenght) + tmp
@@ -423,7 +491,7 @@ func handleConnection(conn net.Conn) {
 
 			privKeyPem, err := os.ReadFile("server-private-key.pem")
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
@@ -431,20 +499,20 @@ func handleConnection(conn net.Conn) {
 
 			privateKey, err := x509.ParsePKCS1PrivateKey(p.Bytes)
 			if err != nil {
-				logError(fmt.Sprintf("error parsing private key: %v", err))
+				server.LogError(fmt.Sprintf("error parsing private key: %v", err))
 				return
 			}
 
 			plainVerifyToken, err := privateKey.Decrypt(nil, verifyTokenClientCiphered, nil)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			if !bytes.Equal(plainVerifyToken, verifyToken) {
 				payload, err := packets.DisconnectLogin("Invalid Session")
 				if err != nil {
-					logError(err)
+					server.LogError(err)
 					return
 				}
 				conn.Write(payload)
@@ -453,7 +521,7 @@ func handleConnection(conn net.Conn) {
 
 			sharedSecret, err = privateKey.Decrypt(nil, sharedSecretCipher, nil)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
@@ -468,14 +536,14 @@ func handleConnection(conn net.Conn) {
 			for i := range 10 {
 				resp, err = http.Get(fmt.Sprintf(MOJANG_SESSION_CHECKER, string(playerName), hex.EncodeToString(sum)))
 				if err != nil {
-					logError(err)
+					server.LogError(err)
 					return
 				}
 				if resp.StatusCode != 200 && i == 9 {
 					defer resp.Body.Close()
 					payload, err := packets.DisconnectLogin("Invalid session")
 					if err != nil {
-						logError(err)
+						server.LogError(err)
 						return
 					}
 					conn.Write(payload)
@@ -490,13 +558,13 @@ func handleConnection(conn net.Conn) {
 
 			mojangPayload, err := io.ReadAll(resp.Body)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			var mojangResponse MojangAnswer
 			if err := json.Unmarshal(mojangPayload, &mojangResponse); err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
@@ -525,7 +593,7 @@ func handleConnection(conn net.Conn) {
 			namebuff.Reset()
 			loginSuccesspkg.Profile.UUID, err = playerUUID.MarshalBinary()
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 			loginSuccesspkg.Profile.Name = name
@@ -534,14 +602,14 @@ func handleConnection(conn net.Conn) {
 			loginSuccesspkg.Profile.Signature = signature
 			block, err := aes.NewCipher(sharedSecret)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			encrypter := cipher.NewCTR(block, sharedSecret)
-			tmpBuff, err := compress.Compress(loginSuccesspkg.Serialize(), CFG.Proprieties.ServerThreshold)
+			tmpBuff, err := compress.Compress(loginSuccesspkg.Serialize(), ServerData.Threshold)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
@@ -561,14 +629,14 @@ func handleConnection(conn net.Conn) {
 		} else {
 
 			compressionStartPkg := &packets.CompressionStart{
-				Threshould: CFG.Proprieties.ServerThreshold,
+				Threshould: ServerData.Threshold,
 			}
 
 			conn.Write(compressionStartPkg.Serialize())
 
 			playerUUID := offline.NameToUUID(string(playerName))
 
-			logInfo(fmt.Sprintf("Received connection from %s as %s (%s) [OFFLINE]", clientAddr, string(playerName), playerUUID.String()))
+			server.LogInfo(fmt.Sprintf("Received connection from %s as %s (%s) [OFFLINE]", clientAddr, string(playerName), playerUUID.String()))
 			var loginSuccesspkg packets.LoginSuccessPacket
 			var namebuff bytes.Buffer
 
@@ -578,28 +646,28 @@ func handleConnection(conn net.Conn) {
 			namebuff.Reset()
 			loginSuccesspkg.Profile.UUID, err = playerUUID.MarshalBinary()
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			response := loginSuccesspkg.Serialize()
 
-			compressedResponse, err := compress.Compress(response, CFG.Proprieties.ServerThreshold)
+			compressedResponse, err := compress.Compress(response, ServerData.Threshold)
 			if err != nil {
-				logError(err)
+				server.LogError(err)
 				return
 			}
 
 			conn.Write(compressedResponse)
 
-			aknowledge := make([]byte, 3)
-			_, err = conn.Read(aknowledge)
+			aknowledge, err := ReadPackageFromConnecion(conn)
 			if err != nil {
+				server.LogError(err)
 				return
 			}
 
 			if aknowledge[2] != byte(packets.PACKET_LOGIN_AKNOWLEDGED) {
-				logError("Invalid packet")
+				server.LogError("Invalid packet")
 				return
 			}
 		}

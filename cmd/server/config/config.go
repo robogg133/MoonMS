@@ -29,7 +29,7 @@ type Configs struct {
 		LevelName string `toml:"level-name"`
 		LevelSeed string `toml:"level-seed"`
 
-		MaxPlayers uint32 `toml:"max-players"`
+		MaxPlayers uint `toml:"max-players"`
 
 		OnlineMode bool   `toml:"online-mode"`
 		Motd       string `toml:"motd"`

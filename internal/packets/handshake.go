@@ -21,7 +21,7 @@ type HandShakeResponseStatus struct {
 	} `json:"version"`
 
 	Players struct {
-		MaxPlayers    uint32              `json:"max"`
+		MaxPlayers    uint                `json:"max"`
 		OnlinePlayers uint32              `json:"online"`
 		PlayerStatus  []PlayerMinimunInfo `json:"sample"`
 	} `json:"players"`
