@@ -30,7 +30,9 @@ func GenerateKeyPair(bitsAmount int) error {
 		file.Close()
 		return err
 	}
-	pem.Encode(file, privateKeyBlock)
+	if err := pem.Encode(file, privateKeyBlock); err != nil {
+		return err
+	}
 	file.Close()
 
 	publicKey := privateKey.Public()
