@@ -2,6 +2,7 @@ package main
 
 import (
 	"MoonMS/cmd/server/compress"
+	"MoonMS/cmd/server/config"
 	"MoonMS/cmd/server/crypto"
 	"MoonMS/internal/datatypes"
 	"MoonMS/internal/offline"
@@ -79,7 +80,7 @@ func CheckFilesToStart() error {
 	if _, err = os.Stat("server-private-key.pem"); err != nil {
 		if os.IsNotExist(err) {
 			server.LogInfo("Generating server key pair")
-			if err := crypto.GenerateKeyPair(ServerData.RSAKeyBits); err != nil {
+			if err := crypto.GenerateKeyPair(config.DefaultValuesForServerConfig().Proprieties.RSAKeyBits); err != nil {
 				server.LogFatal(err)
 			}
 		}
