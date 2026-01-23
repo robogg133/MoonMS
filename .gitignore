@@ -1,0 +1,8 @@
+*.txt
+*.yml
+*.plugin
+*.toml
+*.png
+*.key
+*.pem
+*.wasm
