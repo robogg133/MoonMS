@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 )
@@ -33,4 +34,42 @@ func LogPlugin(pluginName string, args ...any) {
 	message := fmt.Sprintf("%v", args...)
 	fmt.Printf("[%s] \033[32m[%s]:\033[0m %v \n", timestamp, pluginName, message)
 	fmt.Fprintf(LatestLogFile, "[%s] [%s]: %v\n", timestamp, pluginName, message)
+}
+
+type PluginWriter struct {
+	w    io.Writer
+	name string
+}
+
+func GetLogPluginWriter(w io.Writer, pluginName string) *PluginWriter {
+	return &PluginWriter{
+		w:    w,
+		name: pluginName,
+	}
+}
+
+func (p *PluginWriter) Write(b []byte) (int, error) {
+	timestamp := time.Now().Format("2006/01/02 15:04:05")
+
+	fmt.Fprintf(LatestLogFile, "[%s] [%s]: %v", timestamp, p.name, string(b))
+	return fmt.Fprintf(p.w, "[%s] \033[32m[%s]\033[0m: %v", timestamp, p.name, string(b))
+}
+
+type PluginWriterErr struct {
+	w    io.Writer
+	name string
+}
+
+func GetLogPluginWriterErr(w io.Writer, pluginName string) *PluginWriterErr {
+	return &PluginWriterErr{
+		w:    w,
+		name: pluginName,
+	}
+}
+
+func (p *PluginWriterErr) Write(b []byte) (int, error) {
+	timestamp := time.Now().Format("2006/01/02 15:04:05")
+
+	fmt.Fprintf(LatestLogFile, "[%s] [%s] (ERROR): %v", timestamp, p.name, string(b))
+	return fmt.Fprintf(p.w, "[%s] \033[31m[%s] (ERROR)\033[0m: %v", timestamp, p.name, string(b))
 }
