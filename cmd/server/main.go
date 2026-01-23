@@ -99,7 +99,6 @@ func CheckFilesToStart() error {
 					server.LogFatal(err)
 				}
 				publicKey := privateKey.Public()
-
 				publicKeyMarshalized, err := x509.MarshalPKIXPublicKey(publicKey)
 				if err != nil {
 					server.LogFatal(err)
@@ -127,7 +126,7 @@ func CompressLog() error {
 	}
 	defer oldLog.Close()
 
-	f, err := os.Create(fmt.Sprintf("logs/%s.gz", time.Now().Format("2006-01-02--15:04:05")))
+	f, err := os.Create(fmt.Sprintf("logs/%s.log.gz", time.Now().Format("2006-01-02 15:04:05")))
 	if err != nil {
 		return err
 	}
@@ -177,11 +176,12 @@ func main() {
 
 		plugin, err := plugins.ReadPluginFile(f, stat.Size(), path)
 		if err != nil {
-			return err
+			return fmt.Errorf("Error reading plugin %s: %v", path, err)
 		}
 
-		server.LogInfo(fmt.Sprintf("Starting \"%s\"", plugin.Identifier))
-		return plugin.LoadPlugin()
+		server.LogInfo(fmt.Sprintf("Starting %s", plugin.Identifier))
+		go plugin.LoadPlugin()
+		return nil
 	}); err != nil {
 		server.LogFatal(err)
 	}
@@ -199,6 +199,7 @@ func main() {
 		}
 
 		wg.Wait()
+
 		os.Exit(0)
 	}()
 
@@ -676,9 +677,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	conn.SetReadDeadline(time.Time{})
-	for {
-		time.Sleep(5 * time.Second)
-	}
+	select {}
 }
 
 func isConnAlive(conn net.Conn, makeDeadline time.Time) bool {

@@ -1,8 +1,6 @@
-package plugins
+package plugins_lua
 
 import (
-	"sync"
-
 	"github.com/Shopify/go-lua"
 )
 
@@ -28,10 +26,7 @@ func lOnServerStop(l *lua.State) int {
 	return 0
 }
 
-func (plugin *Plugin) RunEventServerStopping(wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	l := plugin.LuaVM
+func RunEventServerStopping(l *lua.State) {
 
 	l.Global(callbacks_server_stop)
 

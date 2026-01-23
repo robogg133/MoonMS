@@ -1,4 +1,4 @@
-package plugins
+package plugins_lua
 
 import (
 	"MoonMS/internal/server"
@@ -94,6 +94,26 @@ func createServerTable(l *lua.State, serverData *server.ServerData) {
 
 	//
 
+	l.PushInteger(int(serverData.Threshold))
+	l.SetField(tableStackIndex, "threshold")
+
+	//
+
+	l.PushString(serverData.Seed)
+	l.SetField(tableStackIndex, "seed")
+
+	//
+
+	l.PushInteger(int(serverData.ServerPort))
+	l.SetField(tableStackIndex, "server_port")
+
+	//
+
+	l.PushString(serverData.VERSION)
+	l.SetField(tableStackIndex, "version")
+
+	//
+
 	createEvents(l, &tableStackIndex)
 
 	l.SetGlobal("Server")
@@ -116,14 +136,14 @@ func (name pluginName) lPrint(state *lua.State) int {
 	return 0
 }
 
-func (plugin *Plugin) startVM() error {
+func startVM(l *lua.State, namePlugin string) error {
 
-	lua.OpenLibraries(plugin.LuaVM)
-	plugin.LuaVM.Register("print", pluginName(plugin.Manifest.Name).lPrint)
+	lua.OpenLibraries(l)
+	l.Register("print", pluginName(namePlugin).lPrint)
 
-	createCallbacks(plugin.LuaVM)
+	createCallbacks(l)
 
-	createServerTable(plugin.LuaVM, server.GetServerData())
+	createServerTable(l, server.GetServerData())
 
 	return nil
 }

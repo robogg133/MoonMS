@@ -1,4 +1,4 @@
-package plugins
+package plugins_lua
 
 import "github.com/Shopify/go-lua"
 
