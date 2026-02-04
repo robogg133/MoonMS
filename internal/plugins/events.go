@@ -21,5 +21,4 @@ func (p *Plugin) RunEventServerStopping(wg *sync.WaitGroup) {
 	case "lua":
 		plugins_lua.RunEventServerStopping(p.Runtime.(*lua.State))
 	}
-	return
 }

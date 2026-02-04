@@ -22,7 +22,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -159,31 +158,42 @@ func main() {
 		server.LogFatal(err)
 	}
 
-	if err := filepath.WalkDir("plugins", func(path string, d fs.DirEntry, err error) error {
+	allDirFiles, err := os.ReadDir("plugins")
+	if err != nil {
+		server.LogFatal(err)
+	}
+
+	server.LogInfo("Intializing plugins")
+	for _, d := range allDirFiles {
 		if d.IsDir() {
-			return nil
+			continue
 		}
+
+		path := filepath.Join("plugins", d.Name())
 
 		f, err := os.Open(path)
 		if err != nil {
-			return err
+			server.LogError(fmt.Sprintf("Error opening file: %v", err))
+			server.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
+			continue
 		}
 
 		stat, err := f.Stat()
 		if err != nil {
-			return err
+			server.LogError(fmt.Sprintf("Error getting file status: %v", err))
+			server.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
+			continue
 		}
 
 		plugin, err := plugins.ReadPluginFile(f, stat.Size(), path)
 		if err != nil {
-			return fmt.Errorf("Error reading plugin %s: %v", path, err)
+			server.LogError(fmt.Sprintf("Error parsing plugin: %v", err))
+			server.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
+			continue
 		}
 
 		server.LogInfo(fmt.Sprintf("Starting %s", plugin.Identifier))
 		go plugin.LoadPlugin()
-		return nil
-	}); err != nil {
-		server.LogFatal(err)
 	}
 
 	go func() {
@@ -263,7 +273,7 @@ func handleConnection(conn net.Conn) {
 
 	switch intention {
 	case 1:
-		statuspkg, err := ReadPackageFromConnecion(conn)
+		statuspkg, err := packets.ReadPackageFromConnecion(conn)
 		if err != nil {
 			server.LogError(err)
 			return
@@ -353,7 +363,7 @@ func handleConnection(conn net.Conn) {
 		Deadline := time.Now().Add(DEADLINE)
 		conn.SetReadDeadline(Deadline)
 
-		buf, err := ReadPackageFromConnecion(conn)
+		buf, err := packets.ReadPackageFromConnecion(conn)
 		if err != nil {
 			server.LogError(err)
 			return
@@ -439,7 +449,7 @@ func handleConnection(conn net.Conn) {
 			conn.Write(responseBuffer.Bytes())
 			responseBuffer.Reset()
 
-			buf, err := ReadPackageFromConnecion(conn)
+			buf, err := packets.ReadPackageFromConnecion(conn)
 			if err != nil {
 				server.LogError(err)
 				return
@@ -662,7 +672,7 @@ func handleConnection(conn net.Conn) {
 
 			conn.Write(compressedResponse)
 
-			aknowledge, err := ReadPackageFromConnecion(conn)
+			aknowledge, err := packets.packets.ReadPackageFromConnecion(conn)
 			if err != nil {
 				server.LogError(err)
 				return
@@ -677,7 +687,9 @@ func handleConnection(conn net.Conn) {
 	}
 
 	conn.SetReadDeadline(time.Time{})
-	select {}
+
+	// Configuration Process
+
 }
 
 func isConnAlive(conn net.Conn, makeDeadline time.Time) bool {

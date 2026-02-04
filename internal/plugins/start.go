@@ -7,7 +7,9 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Shopify/go-lua"
 	"go.yaml.in/yaml/v4"
@@ -86,14 +88,72 @@ func ReadPluginFile(r io.ReaderAt, size int64, path string) (Plugin, error) {
 	if err != nil {
 		return Plugin{}, err
 	}
-	defer f.Close()
 
-	luaFile, err := io.ReadAll(f)
+	mainFile, err := io.ReadAll(f)
 	if err != nil {
+		f.Close()
 		return Plugin{}, err
 	}
+	f.Close()
 
-	pluginObj.MainFileContent = luaFile
+	pluginObj.MainFileContent = mainFile
+
+	thisPluginDir := filepath.Join("plugins", manifest.Name)
+	_, err = os.Stat(thisPluginDir)
+	if err == nil {
+		return pluginObj, nil
+	}
+	if os.IsNotExist(err) {
+
+		if err := os.Mkdir(thisPluginDir, 0755); err != nil {
+			return Plugin{}, err
+		}
+		for _, f := range reader.File {
+			base := filepath.Base(f.Name)
+			switch {
+			case strings.HasSuffix(base, ".wasm"):
+				continue
+			case strings.HasSuffix(base, ".lua"):
+				continue
+			case strings.HasSuffix(base, ".so"):
+				continue
+			case strings.HasSuffix(base, manifest.Entry):
+				continue
+			case base == MANIFEST_FILE_NAME:
+				continue
+			}
+
+			fileName := filepath.Join(thisPluginDir, f.Name)
+
+			if strings.Contains(filepath.Dir(f.Name), "/data/") {
+				fileName = filepath.Join(thisPluginDir, strings.Replace(f.Name, "/data/", "/", 1))
+			}
+
+			if f.FileInfo().IsDir() {
+				if err := os.Mkdir(fileName, f.Mode().Perm()); err != nil {
+					return Plugin{}, err
+				}
+				continue
+			}
+			unzipedFile, err := f.Open()
+			if err != nil {
+				return Plugin{}, err
+			}
+
+			newFile, err := os.Create(fileName)
+			if err != nil {
+				unzipedFile.Close()
+				return Plugin{}, err
+			}
+
+			io.Copy(newFile, unzipedFile)
+			newFile.Close()
+			unzipedFile.Close()
+		}
+		os.RemoveAll(filepath.Join(thisPluginDir, "data"))
+	} else {
+		return Plugin{}, err
+	}
 
 	return pluginObj, nil
 }

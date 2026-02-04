@@ -3,6 +3,8 @@
 
 package moonms_api
 
+import "fmt"
+
 type events struct {
 	ServerStopping []func()
 }
@@ -15,6 +17,7 @@ func RegisterOnServerStop(fn func()) {
 
 //export on_server_stop
 func on_server_stop() {
+	fmt.Println("got called")
 	for _, fn := range allEvents.ServerStopping {
 		go fn()
 	}
