@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var PROTOCOL_VERSION uint16 = 774
+var PROTOCOL_VERSION int32 = 774
 var CURRENT_VERSION string = "1.21.11"
 
 const MOONMS_VERSION string = "1.0.0"
@@ -15,7 +15,7 @@ var LatestLogFile *os.File
 var ServerDataPublic ServerData
 
 type ServerData struct {
-	PROTOCOL_VERSION  uint16
+	PROTOCOL_VERSION  int32
 	MINECRAFT_VERSION string
 
 	Motd string

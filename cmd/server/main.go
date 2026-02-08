@@ -143,6 +143,8 @@ func CompressLog() error {
 
 func main() {
 
+	packets.Init()
+
 	var err error
 
 	if err = CompressLog(); err != nil {
@@ -235,43 +237,20 @@ func handleConnection(conn net.Conn) {
 
 	var sharedSecret []byte
 
-	startingData := make([]byte, 2)
-	_, err := conn.Read(startingData)
+	reader := packets.NewReaderFromReader(conn)
+
+	handshake, err := packets.UnmarshalPacket(reader)
 	if err != nil {
 		server.LogError(err)
 		return
 	}
 
-	if startingData[1] != packets.PACKET_HANDSHAKE {
-		server.LogError("The player don't started the connection with a handshake")
+	if handshake.ID() != packets.PACKET_HANDSHAKE {
+		server.LogError("The player didn't started the connection with a handshake")
 		return
 	}
 
-	buf := make([]byte, uint8(startingData[0])-1)
-
-	_, err = conn.Read(buf)
-	if err != nil {
-		server.LogError(err)
-	}
-
-	buff := bytes.NewBuffer(buf)
-	n, readed, err := datatypes.ParseVarInt(buff)
-	if err != nil {
-		server.LogError(err)
-		return
-	}
-	if uint16(n) != ServerData.PROTOCOL_VERSION {
-		server.LogError("Mismatched version from the client")
-	}
-	stringLenght := uint8(buf[readed])
-	stringOffset := stringLenght + uint8(readed) + 1
-	// serverAdress := string(buf[readed+1 : stringOffset])
-
-	// port := binary.BigEndian.Uint16(buf[stringOffset : stringOffset+2])
-
-	intention, _, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[stringOffset+2:]))
-
-	switch intention {
+	switch handshake.(*packets.Handshake).Intent {
 	case 1:
 		statuspkg, err := packets.ReadPackageFromConnecion(conn)
 		if err != nil {
@@ -279,7 +258,7 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		if statuspkg[1] != packets.PACKET_HANDSHAKE {
+		if int32(statuspkg[1]) != packets.PACKET_HANDSHAKE {
 			server.LogError("mismatched packet id gaved by client")
 			return
 		}
@@ -288,7 +267,7 @@ func handleConnection(conn net.Conn) {
 		var status packets.HandShakeResponseStatus
 
 		status.Version.Name = server.CURRENT_VERSION
-		status.Version.ProtocolVersion = uint16(server.PROTOCOL_VERSION)
+		status.Version.ProtocolVersion = server.PROTOCOL_VERSION
 
 		status.Players.MaxPlayers = ServerData.MaxPlayers
 		status.Players.OnlinePlayers = 0
@@ -308,52 +287,22 @@ func handleConnection(conn net.Conn) {
 
 		status.Description.Text = ServerData.Motd
 
-		statusSerialized, err := json.Marshal(&status)
+		data, err := packets.MarshalPacket(&status, nil)
 		if err != nil {
 			server.LogError(err)
 			return
 		}
-		lenghtForResponse := len(statusSerialized)
-		lenghtForResponsePayload := datatypes.NewVarInt(int32(len(statusSerialized)))
-		packageID := datatypes.NewVarInt(packets.PACKET_HANDSHAKE)
+		conn.Write(data)
 
-		totalLenght := len(packageID) + lenghtForResponse + len(lenghtForResponsePayload)
+		ping, err := packets.UnmarshalPacket(reader)
 
-		packageLenght := datatypes.NewVarInt(int32(totalLenght))
-
-		var response bytes.Buffer
-
-		response.Write(packageLenght)
-		response.Write(packageID)
-		response.Write(lenghtForResponsePayload)
-		response.Write(statusSerialized)
-
-		conn.Write(response.Bytes())
-
-		pingPkg := make([]byte, 10)
-
-		conn.Read(pingPkg)
-
-		offset := 0
-		_, n, err := datatypes.ParseVarInt(bytes.NewReader(pingPkg))
-		if err != nil {
-			server.LogError(err)
-			return
-		}
-
-		offset += n
-
-		pkgID, n, err := datatypes.ParseVarInt(bytes.NewReader(pingPkg[n:]))
-		if err != nil {
-			server.LogError(err)
-			return
-		}
-
-		offset += n
-		n = 0
-
-		if pkgID == packets.PACKET_PING {
-			conn.Write(packets.SerializePong(pingPkg[offset:]))
+		if ping.ID() == packets.PACKET_PING_PONG {
+			data, err := packets.MarshalPacket(ping, nil)
+			if err != nil {
+				server.LogError(err)
+				return
+			}
+			conn.Write(data)
 		}
 
 		return
@@ -363,19 +312,19 @@ func handleConnection(conn net.Conn) {
 		Deadline := time.Now().Add(DEADLINE)
 		conn.SetReadDeadline(Deadline)
 
-		buf, err := packets.ReadPackageFromConnecion(conn)
+		buff, err := packets.ReadPackageFromConnecion(conn)
 		if err != nil {
 			server.LogError(err)
 			return
 		}
 
-		_, offset, err := datatypes.ParseVarInt(bytes.NewReader(buf))
+		_, offset, err := datatypes.ParseVarInt(bytes.NewReader(buff))
 		if err != nil {
 			server.LogError(err)
 			return
 		}
 
-		protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
+		protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buff[offset:]))
 		if err != nil {
 			server.LogError(err)
 			return
@@ -388,7 +337,7 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		stringLenght, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
+		stringLenght, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buff[offset:]))
 		if err != nil {
 			server.LogError(err)
 			return
@@ -397,109 +346,55 @@ func handleConnection(conn net.Conn) {
 		offset += tmp
 		tmp = 0
 
-		playerName := buf[offset : offset+int(stringLenght)]
+		playerName := buff[offset : offset+int(stringLenght)]
 		clientAddr := conn.RemoteAddr().String()
 
 		if ServerData.OnlineMode {
-			playerUUID, err := uuid.FromBytes(buf[offset+int(stringLenght):])
+			playerUUID, err := uuid.FromBytes(buff[offset+int(stringLenght):])
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 			server.LogInfo(fmt.Sprintf("Received connection from %s as %s (%s)", clientAddr, string(playerName), playerUUID.String()))
 
-			packetID := datatypes.NewVarInt(int32(packets.PACKET_ENCRYPTION_REQUEST))
-
-			serverID := []byte("")
-			serverIDPrefix := datatypes.NewVarInt(int32(len(serverID)))
-
 			publicKeyMarshal, err := os.ReadFile("server-public.key")
 			if err != nil {
 				server.LogError(err)
 				return
 			}
-			publicKeyMarshalPrefix := datatypes.NewVarInt(int32(len(publicKeyMarshal)))
 
 			verifyToken := make([]byte, 4)
 			rand.Read(verifyToken)
-			verifyTokenPrefix := datatypes.NewVarInt(4)
 
-			shouldAuth := datatypes.NewBoolean(true)
-
-			totalLenght := len(packetID) + len(serverIDPrefix) + len(serverID) + len(publicKeyMarshalPrefix) + len(publicKeyMarshal) + len(verifyTokenPrefix) + len(verifyToken) + 1 // +1 for shouldAuth
-			lenght := datatypes.NewVarInt(int32(totalLenght))
-
-			var responseBuffer bytes.Buffer
-
-			responseBuffer.Write(lenght)
-			responseBuffer.Write(packetID)
-
-			responseBuffer.Write(serverIDPrefix)
-			responseBuffer.Write(serverID)
-
-			responseBuffer.Write(publicKeyMarshalPrefix)
-			responseBuffer.Write(publicKeyMarshal)
-
-			responseBuffer.Write(verifyTokenPrefix)
-			responseBuffer.Write(verifyToken)
-
-			responseBuffer.WriteByte(byte(shouldAuth))
-
-			//Sending encryption request
-			conn.Write(responseBuffer.Bytes())
-			responseBuffer.Reset()
-
-			buf, err := packets.ReadPackageFromConnecion(conn)
+			var response packets.EncryptionRequest
+			response.ServerID = ""
+			response.PublicKey = publicKeyMarshal
+			response.VerifyToken = verifyToken
+			response.ShouldAuth = true
+			data, err := packets.MarshalPacket(&response, nil)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
+			conn.Write(data)
 
 			compressionStartPkg := &packets.CompressionStart{
 				Threshould: ServerData.Threshold,
 			}
 
-			conn.Write(compressionStartPkg.Serialize())
-
-			_, offset, err = datatypes.ParseVarInt(bytes.NewReader(buf))
+			marshalCompressStart, err := packets.MarshalPacket(compressionStartPkg, nil)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
+			conn.Write(marshalCompressStart)
 
-			protocolID, tmp, err := datatypes.ParseVarInt(bytes.NewReader(buf[offset:]))
+			pkg, err := packets.UnmarshalPacket(reader)
 			if err != nil {
-				server.LogError(err)
-				return
-			}
-			offset += tmp
-
-			if protocolID != packets.PACKET_ENCRYPTION_RESPONSE {
-				server.LogError("Player failed to answer encryption response")
 				return
 			}
 
-			sharedSecretLenght, tmp, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[offset:]))
-			if err != nil {
-				server.LogError(err)
-				return
-			}
-			offset += tmp
-			tmp = 0
-
-			sharedSecretCipher := make([]byte, sharedSecretLenght)
-
-			copy(sharedSecretCipher, buf[offset:offset+int(sharedSecretLenght)])
-
-			verifyTokenLenght, tmp, err := datatypes.ParseVarInt(bytes.NewBuffer(buf[offset+int(sharedSecretLenght):]))
-			if err != nil {
-				server.LogError(err)
-				return
-			}
-			offset += int(sharedSecretLenght) + tmp
-
-			verifyTokenClientCiphered := make([]byte, verifyTokenLenght)
-			copy(verifyTokenClientCiphered, buf[offset:offset+int(verifyTokenLenght)])
+			encR := pkg.(*packets.EncryptionResponse)
 
 			privKeyPem, err := os.ReadFile("server-private-key.pem")
 			if err != nil {
@@ -515,30 +410,25 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 
-			plainVerifyToken, err := privateKey.Decrypt(nil, verifyTokenClientCiphered, nil)
+			plainToken, err := privateKey.Decrypt(nil, encR.VerifyTokenCiphered, nil)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 
-			if !bytes.Equal(plainVerifyToken, verifyToken) {
-				payload, err := packets.DisconnectLogin("Invalid Session")
-				if err != nil {
-					server.LogError(err)
-					return
-				}
-				conn.Write(payload)
+			if !bytes.Equal(plainToken, verifyToken) {
+				server.LogError("Invalid Session")
 				return
 			}
 
-			sharedSecret, err = privateKey.Decrypt(nil, sharedSecretCipher, nil)
+			sharedSecret, err = privateKey.Decrypt(nil, encR.SharedSecretCiphered, nil)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 
 			hash := sha1.New()
-			hash.Write(serverID)
+			hash.Write([]byte(""))
 			hash.Write(sharedSecret)
 			hash.Write(publicKeyMarshal)
 
@@ -625,6 +515,8 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 
+			packets.UnmarshalPacket(packets.NewReaderFromReader(packets.NewCipherReader(conn, encrypter)))
+
 			responseCipher := make([]byte, len(tmpBuff))
 			encrypter.XORKeyStream(responseCipher, tmpBuff)
 			conn.Write(responseCipher)
@@ -672,7 +564,7 @@ func handleConnection(conn net.Conn) {
 
 			conn.Write(compressedResponse)
 
-			aknowledge, err := packets.packets.ReadPackageFromConnecion(conn)
+			aknowledge, err := packets.ReadPackageFromConnecion(conn)
 			if err != nil {
 				server.LogError(err)
 				return

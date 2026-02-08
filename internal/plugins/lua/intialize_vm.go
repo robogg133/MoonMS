@@ -31,7 +31,7 @@ func createServerTable(l *lua.State, serverData *server.ServerData) {
 	l.PushInteger(int(serverData.PROTOCOL_VERSION))
 	l.SetField(tableStackIndex, "protocol_version")
 	l.PushGoFunction(func(state *lua.State) int {
-		serverData.PROTOCOL_VERSION = uint16(lua.CheckInteger(state, 1))
+		serverData.PROTOCOL_VERSION = int32(lua.CheckInteger(state, 1))
 		return 0
 	})
 	l.SetField(tableStackIndex, "set_protocol_version")

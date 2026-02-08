@@ -1,18 +1,30 @@
 package packets
 
-import "MoonMS/internal/datatypes"
+const PACKET_PING_PONG int32 = 0x01
 
-func SerializePong(num []byte) []byte {
+type PingPong struct {
+	Bytes []byte
+}
 
-	protocolID := datatypes.NewVarInt(int32(PACKET_PONG))
-	packetLenght := datatypes.NewVarInt(int32(len(protocolID) + len(num)))
+func (p *PingPong) ID() int32 { return PACKET_PING_PONG }
 
-	response := make([]byte, 10)
+func (p *PingPong) Encode(w *Writer) error {
 
-	offset := 0
-	offset += copy(response, packetLenght)
-	offset += copy(response[offset:], protocolID)
-	copy(response[offset:], num)
+	if err := w.Write(p.Bytes); err != nil {
+		return err
+	}
 
-	return response
+	return nil
+}
+
+func (p *PingPong) Decode(r *Reader) error {
+
+	buff := make([]byte, 8)
+	if _, err := r.Read(buff); err != nil {
+		return err
+	}
+
+	p.Bytes = buff
+
+	return nil
 }
