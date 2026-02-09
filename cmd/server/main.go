@@ -1,7 +1,6 @@
 package main
 
 import (
-	"MoonMS/cmd/server/compress"
 	"MoonMS/cmd/server/config"
 	"MoonMS/cmd/server/crypto"
 	"MoonMS/internal/datatypes"
@@ -44,6 +43,8 @@ type MojangAnswer struct {
 }
 
 var AnonymousPlayer = &packets.PlayerMinimunInfo{Username: "Anonymous Player", UUID: "00000000-0000-0000-0000-000000000000"}
+
+var DebugOn bool
 
 var ServerData *server.ServerData
 
@@ -145,6 +146,10 @@ func main() {
 
 	packets.Init()
 
+	if os.Getenv("DEBUG") == "true" {
+		DebugOn = true
+	}
+
 	var err error
 
 	if err = CompressLog(); err != nil {
@@ -235,11 +240,11 @@ func main() {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	var sharedSecret []byte
+	var EncryptKey cipher.Stream
 
 	reader := packets.NewReaderFromReader(conn)
 
-	handshake, err := packets.UnmarshalPacket(reader)
+	handshake, err := packets.UnmarshalPacket(reader, -1)
 	if err != nil {
 		server.LogError(err)
 		return
@@ -287,27 +292,29 @@ func handleConnection(conn net.Conn) {
 
 		status.Description.Text = ServerData.Motd
 
-		data, err := packets.MarshalPacket(&status, nil)
+		data, err := packets.MarshalPacket(&status, nil, -1)
 		if err != nil {
 			server.LogError(err)
 			return
 		}
 		conn.Write(data)
 
-		ping, err := packets.UnmarshalPacket(reader)
+		ping, err := packets.UnmarshalPacket(reader, -1)
 
 		if ping.ID() == packets.PACKET_PING_PONG {
-			data, err := packets.MarshalPacket(ping, nil)
+			data, err := packets.MarshalPacket(ping, nil, -1)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 			conn.Write(data)
 		}
-
 		return
 
 	case 2:
+		packets.RegisterPacket(packets.PACKET_ENCRYPTION_RESPONSE, func() packets.Packet {
+			return &packets.EncryptionResponse{}
+		})
 
 		Deadline := time.Now().Add(DEADLINE)
 		conn.SetReadDeadline(Deadline)
@@ -371,25 +378,17 @@ func handleConnection(conn net.Conn) {
 			response.PublicKey = publicKeyMarshal
 			response.VerifyToken = verifyToken
 			response.ShouldAuth = true
-			data, err := packets.MarshalPacket(&response, nil)
+			data, err := packets.MarshalPacket(&response, nil, -1)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 			conn.Write(data)
-
-			compressionStartPkg := &packets.CompressionStart{
-				Threshould: ServerData.Threshold,
+			if DebugOn {
+				server.LogInfo("Write Encryption request")
 			}
 
-			marshalCompressStart, err := packets.MarshalPacket(compressionStartPkg, nil)
-			if err != nil {
-				server.LogError(err)
-				return
-			}
-			conn.Write(marshalCompressStart)
-
-			pkg, err := packets.UnmarshalPacket(reader)
+			pkg, err := packets.UnmarshalPacket(reader, -1)
 			if err != nil {
 				return
 			}
@@ -415,13 +414,15 @@ func handleConnection(conn net.Conn) {
 				server.LogError(err)
 				return
 			}
-
+			if DebugOn {
+				server.LogInfo("Im still here")
+			}
 			if !bytes.Equal(plainToken, verifyToken) {
 				server.LogError("Invalid Session")
 				return
 			}
 
-			sharedSecret, err = privateKey.Decrypt(nil, encR.SharedSecretCiphered, nil)
+			sharedSecret, err := privateKey.Decrypt(nil, encR.SharedSecretCiphered, nil)
 			if err != nil {
 				server.LogError(err)
 				return
@@ -487,56 +488,65 @@ func handleConnection(conn net.Conn) {
 			}
 
 			var loginSuccesspkg packets.LoginSuccessPacket
-			var namebuff bytes.Buffer
 
-			namebuff.Write(datatypes.NewVarInt(int32(len(playerName))))
-			namebuff.Write(playerName)
-			loginSuccesspkg.Profile.Username = datatypes.String(namebuff.Bytes())
-			namebuff.Reset()
 			loginSuccesspkg.Profile.UUID, err = playerUUID.MarshalBinary()
 			if err != nil {
 				server.LogError(err)
 				return
 			}
+			loginSuccesspkg.Profile.Username = string(playerName)
 			loginSuccesspkg.Profile.Name = name
 			loginSuccesspkg.Profile.Value = value
-			loginSuccesspkg.Profile.HaveSignature = true
 			loginSuccesspkg.Profile.Signature = signature
+
 			block, err := aes.NewCipher(sharedSecret)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 
-			encrypter := cipher.NewCTR(block, sharedSecret)
-			tmpBuff, err := compress.Compress(loginSuccesspkg.Serialize(), ServerData.Threshold)
+			EncryptKey = cipher.NewCTR(block, sharedSecret)
+			// Compression
+			compressionStartPkg := &packets.CompressionStart{
+				Threshould: ServerData.Threshold,
+			}
+
+			marshalCompressStart, err := packets.MarshalPacket(compressionStartPkg, EncryptKey, -1)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
+			conn.Write(marshalCompressStart)
+			if DebugOn {
+				server.LogInfo("Write Compress Start")
+			}
+			// Compression
 
-			packets.UnmarshalPacket(packets.NewReaderFromReader(packets.NewCipherReader(conn, encrypter)))
+			reader = packets.NewReaderFromReader(packets.NewCipherReader(conn, EncryptKey))
 
-			responseCipher := make([]byte, len(tmpBuff))
-			encrypter.XORKeyStream(responseCipher, tmpBuff)
-			conn.Write(responseCipher)
-			tmpBuff = nil
-			fmt.Println("sent everything")
+			marshalized, err := packets.MarshalPacket(&loginSuccesspkg, EncryptKey, int(ServerData.Threshold))
+			if err != nil {
+				server.LogError(err)
+				return
+			}
+			conn.Write(marshalized)
+			if DebugOn {
+				server.LogInfo("sent everything")
+			}
 
 			aknowledge := make([]byte, 3)
 			_, err = conn.Read(aknowledge)
 			if err != nil {
 				return
 			}
-			fmt.Println(aknowledge)
 
 		} else {
 
-			compressionStartPkg := &packets.CompressionStart{
-				Threshould: ServerData.Threshold,
-			}
+			//		compressionStartPkg := &packets.CompressionStart{
+			//			Threshould: ServerData.Threshold,
+			//		}
 
-			conn.Write(compressionStartPkg.Serialize())
+			//	conn.Write(compressionStartPkg.Serialize())
 
 			playerUUID := offline.NameToUUID(string(playerName))
 
@@ -546,7 +556,7 @@ func handleConnection(conn net.Conn) {
 
 			namebuff.Write(datatypes.NewVarInt(int32(len(playerName))))
 			namebuff.Write(playerName)
-			loginSuccesspkg.Profile.Username = datatypes.String(namebuff.Bytes())
+			//		loginSuccesspkg.Profile.Username = datatypes.String(namebuff.Bytes())
 			namebuff.Reset()
 			loginSuccesspkg.Profile.UUID, err = playerUUID.MarshalBinary()
 			if err != nil {
@@ -554,15 +564,15 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 
-			response := loginSuccesspkg.Serialize()
+			//		response := loginSuccesspkg.Serialize()
 
-			compressedResponse, err := compress.Compress(response, ServerData.Threshold)
+			//		compressedResponse, err := compress.Compress(response, ServerData.Threshold)
 			if err != nil {
 				server.LogError(err)
 				return
 			}
 
-			conn.Write(compressedResponse)
+			//		conn.Write(compressedResponse)
 
 			aknowledge, err := packets.ReadPackageFromConnecion(conn)
 			if err != nil {
