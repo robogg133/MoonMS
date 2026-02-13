@@ -44,8 +44,6 @@ type MojangAnswer struct {
 
 var AnonymousPlayer = &packets.PlayerMinimunInfo{Username: "Anonymous Player", UUID: "00000000-0000-0000-0000-000000000000"}
 
-var DebugOn bool
-
 var ServerData *server.ServerData
 
 func CheckFilesToStart() error {
@@ -147,7 +145,7 @@ func main() {
 	packets.Init()
 
 	if os.Getenv("DEBUG") == "true" {
-		DebugOn = true
+		server.DebugEnabled = true
 	}
 
 	var err error
@@ -239,6 +237,7 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
+	server.Debug("CONN -> ", conn.LocalAddr())
 
 	var EncryptKey cipher.Stream
 
@@ -384,9 +383,8 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 			conn.Write(data)
-			if DebugOn {
-				server.LogInfo("Write Encryption request")
-			}
+
+			server.Debug("Write Encryption request")
 
 			pkg, err := packets.UnmarshalPacket(reader, -1)
 			if err != nil {
@@ -414,9 +412,9 @@ func handleConnection(conn net.Conn) {
 				server.LogError(err)
 				return
 			}
-			if DebugOn {
-				server.LogInfo("Im still here")
-			}
+
+			server.Debug("Im still here")
+
 			if !bytes.Equal(plainToken, verifyToken) {
 				server.LogError("Invalid Session")
 				return
@@ -517,9 +515,9 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 			conn.Write(marshalCompressStart)
-			if DebugOn {
-				server.LogInfo("Write Compress Start")
-			}
+
+			server.Debug("Write Compress Start")
+
 			// Compression
 
 			reader = packets.NewReaderFromReader(packets.NewCipherReader(conn, EncryptKey))
@@ -530,9 +528,8 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 			conn.Write(marshalized)
-			if DebugOn {
-				server.LogInfo("sent everything")
-			}
+
+			server.Debug("Sent everything")
 
 			aknowledge := make([]byte, 3)
 			_, err = conn.Read(aknowledge)
@@ -618,8 +615,8 @@ func GetBase64Image(path string) (string, error) {
 		return "", err
 	}
 
-	if len(content) > 5120 {
-		return "", fmt.Errorf("The file size is too big!! needs to be lower than 5KB, using none")
+	if len(content) > 15360 {
+		server.LogWarn("The image server-icon is more than 15KB, this is not recommended!!!")
 	}
 
 	return base64.StdEncoding.EncodeToString(content), nil

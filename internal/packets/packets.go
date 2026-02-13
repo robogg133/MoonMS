@@ -9,6 +9,11 @@ import (
 	"io"
 )
 
+const (
+	SERVER_BOUND uint8 = 0
+	CLIENT_BOUND uint8 = 1
+)
+
 type Packet interface {
 	ID() int32
 

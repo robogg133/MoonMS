@@ -7,11 +7,30 @@ import (
 	"time"
 )
 
+var DebugEnabled bool
+
 func LogInfo(args ...any) {
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
 	message := fmt.Sprintf("%v", args...)
 	fmt.Printf("[%s] \033[34m[INFO]:\033[0m %v\n", timestamp, message)
 	fmt.Fprintf(LatestLogFile, "[%s] [INFO]: %v\n", timestamp, message)
+}
+
+func Debug(args ...any) {
+	if !DebugEnabled {
+		return
+	}
+	timestamp := time.Now().Format("2006/01/02 15:04:05")
+	message := fmt.Sprintf("%v", args...)
+	fmt.Printf("[%s] \033[33m[DEBUG]:\033[0m %v\n", timestamp, message)
+	fmt.Fprintf(LatestLogFile, "[%s] [DEBUG]: %v\n", timestamp, message)
+}
+
+func LogWarn(args ...any) {
+	timestamp := time.Now().Format("2006/01/02 15:04:05")
+	message := fmt.Sprintf("%v", args...)
+	fmt.Printf("[%s] \033[33m[WARN]:\033[0m %v\n", timestamp, message)
+	fmt.Fprintf(LatestLogFile, "[%s] [WARN]: %v\n", timestamp, message)
 }
 
 func LogError(args ...any) {
