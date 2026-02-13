@@ -17,49 +17,6 @@ type Server struct {
 	ServerPrivateKey *rsa.PrivateKey
 }
 
-type MinecraftServerConfig struct {
-	ProtcolVersion int32
-
-	MinecraftVersion string
-
-	Motd string
-
-	Difficulty    string
-	Gamemode      string
-	ForceGamemode bool
-	LevelName     string
-	Seed          string
-	Hardcore      bool
-
-	MaxPlayer uint
-
-	OnlineMode bool
-
-	AllowServerList bool
-
-	ServerIcon string
-
-	ServerPort uint16
-
-	RSAKeyBitAmmount uint
-
-	Threshold uint
-
-	ViewDistance uint16
-
-	SimluationDistance uint16
-
-	AllowNether bool
-
-	AllowEnd bool
-
-	TPS float32
-
-	Encryption bool
-
-	Whitelist bool
-}
-
 type Config struct {
 	LatestLogFile io.Writer
 	DebugEnabled  bool
@@ -78,8 +35,8 @@ func (s *Server) Start() {
 		}
 	}()
 
-	s.LogInfo(fmt.Sprintf("Starting minecraft %s server on port: %d", s.Config.StartName, s.MinecraftConfig.ServerPort))
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.MinecraftConfig.ServerPort))
+	s.LogInfo(fmt.Sprintf("Starting minecraft %s server on port: %d", s.Config.StartName, s.MinecraftConfig.Proprieties.ServerPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.MinecraftConfig.Proprieties.ServerPort))
 	if err != nil {
 		panic(err)
 	}
@@ -91,6 +48,7 @@ func (s *Server) Start() {
 			s.LogPanic(err)
 			continue
 		}
+		defer conn.Close()
 
 	}
 
