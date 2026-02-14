@@ -1,38 +1,15 @@
 package main
 
 import (
-	"MoonMS/cmd/server/config"
-	"MoonMS/cmd/server/crypto"
-	"MoonMS/internal/datatypes"
-	"MoonMS/internal/offline"
+	"MoonMS/app"
 	"MoonMS/internal/packets"
-	"MoonMS/internal/plugins"
-	"MoonMS/internal/server"
-	"bytes"
-	"compress/gzip"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha1"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
-	"encoding/pem"
-	"fmt"
-	"io"
-	"log"
-	"net"
-	"net/http"
+	"crypto/rsa"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"sync"
 	"time"
 
 	_ "embed"
-
-	"github.com/google/uuid"
 )
 
 const MOJANG_SESSION_CHECKER = `https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s`
@@ -44,197 +21,49 @@ type MojangAnswer struct {
 
 var AnonymousPlayer = &packets.PlayerMinimunInfo{Username: "Anonymous Player", UUID: "00000000-0000-0000-0000-000000000000"}
 
-var ServerData *server.ServerData
-
-func CheckFilesToStart() error {
-
-	_ = os.Mkdir("plugins", 0755)
-	_ = os.Mkdir("logs", 0755)
-
-	_, err := os.Stat("banned-ips.txt")
-	if err != nil {
-		if os.IsNotExist(err) {
-			f, err := os.Create("banned-ips.txt")
-			if err != nil {
-
-				return err
-			}
-			f.Close()
-
-		}
-	}
-	_, err = os.Stat("banned-accounts.txt")
-	if err != nil {
-		if os.IsNotExist(err) {
-			f, err := os.Create("banned-accounts.txt")
-			if err != nil {
-				return err
-			}
-			f.Close()
-
-		}
-	}
-
-	if _, err = os.Stat("server-private-key.pem"); err != nil {
-		if os.IsNotExist(err) {
-			server.LogInfo("Generating server key pair")
-			if err := crypto.GenerateKeyPair(config.DefaultValuesForServerConfig().Proprieties.RSAKeyBits); err != nil {
-				server.LogFatal(err)
-			}
-		}
-	} else {
-		if _, err = os.Stat("server-public.key"); err != nil {
-			if os.IsNotExist(err) {
-				server.LogError("Public key don't exist, but private exist, generating another public key from the private key")
-				pemKey, err := os.ReadFile("server-private-key.pem")
-				if err != nil {
-					server.LogFatal(err)
-				}
-				p, _ := pem.Decode(pemKey)
-
-				privateKey, err := x509.ParsePKCS1PrivateKey(p.Bytes)
-				if err != nil {
-					server.LogFatal(err)
-				}
-				publicKey := privateKey.Public()
-				publicKeyMarshalized, err := x509.MarshalPKIXPublicKey(publicKey)
-				if err != nil {
-					server.LogFatal(err)
-				}
-
-				if err := os.WriteFile("server-public.key", publicKeyMarshalized, 0644); err != nil {
-					log.Fatal(err)
-				}
-			}
-		}
-
-	}
-
-	return nil
-}
-
-func CompressLog() error {
-
-	oldLog, err := os.Open("logs/latest.log")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	defer oldLog.Close()
-
-	f, err := os.Create(fmt.Sprintf("logs/%s.log.gz", time.Now().Format("2006-01-02 15:04:05")))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	writer := gzip.NewWriter(f)
-
-	_, err = io.Copy(writer, oldLog)
-	if err != nil {
-		return err
-	}
-
-	return os.Remove("logs/latest.log")
-}
-
 func main() {
 
-	packets.Init()
+	cfg := app.MinecraftServerConfig{}
+	if err := cfg.ConfigFile(); err != nil {
+		panic(err)
+	}
+
+	scfg := app.Config{
+		LatestLogFile: "logs/latest.log",
+		StartName:     "java",
+		DebugEnabled:  false,
+		PluginsFolder: "plugins",
+	}
 
 	if os.Getenv("DEBUG") == "true" {
-		server.DebugEnabled = true
+		scfg.DebugEnabled = true
 	}
 
-	var err error
-
-	if err = CompressLog(); err != nil {
-		server.LogError(err)
-	}
-
-	if err = CheckFilesToStart(); err != nil {
-		server.LogError(err)
-		return
-	}
-	ServerData, err = server.InitServerData()
+	privateKey, err := rsa.GenerateKey(rand.Reader, int(cfg.Advanced.RSAKeyBitAmmount))
 	if err != nil {
-		server.LogFatal(err)
+		panic(err)
 	}
 
-	allDirFiles, err := os.ReadDir("plugins")
-	if err != nil {
-		server.LogFatal(err)
+	server := app.New(cfg, scfg, privateKey)
+	if err := server.StartLogger(); err != nil {
+		panic(err)
 	}
-
-	server.LogInfo("Intializing plugins")
-	for _, d := range allDirFiles {
-		if d.IsDir() {
-			continue
-		}
-
-		path := filepath.Join("plugins", d.Name())
-
-		f, err := os.Open(path)
-		if err != nil {
-			server.LogError(fmt.Sprintf("Error opening file: %v", err))
-			server.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
-			continue
-		}
-
-		stat, err := f.Stat()
-		if err != nil {
-			server.LogError(fmt.Sprintf("Error getting file status: %v", err))
-			server.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
-			continue
-		}
-
-		plugin, err := plugins.ReadPluginFile(f, stat.Size(), path)
-		if err != nil {
-			server.LogError(fmt.Sprintf("Error parsing plugin: %v", err))
-			server.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
-			continue
-		}
-
-		server.LogInfo(fmt.Sprintf("Starting %s", plugin.Identifier))
-		go plugin.LoadPlugin()
-	}
+	server.InitPlugins()
 
 	go func() {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt)
 		<-sig
 
-		var wg sync.WaitGroup
-
-		for _, pl := range *plugins.GetAllPlugins() {
-			wg.Add(1)
-			go pl.RunEventServerStopping(&wg)
-		}
-
-		wg.Wait()
+		server.Stop()
 
 		os.Exit(0)
 	}()
 
-	server.LogInfo(fmt.Sprintf("Starting minecraft java edittion tcp listener on port %d", ServerData.ServerPort))
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", ServerData.ServerPort))
-	if err != nil {
-		server.LogFatal(err)
-	}
-	defer listener.Close()
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		go handleConnection(conn)
-	}
+	server.Start()
 }
 
+/*
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	server.Debug("CONN -> ", conn.LocalAddr())
@@ -255,60 +84,6 @@ func handleConnection(conn net.Conn) {
 	}
 
 	switch handshake.(*packets.Handshake).Intent {
-	case 1:
-		statuspkg, err := packets.ReadPackageFromConnecion(conn)
-		if err != nil {
-			server.LogError(err)
-			return
-		}
-
-		if int32(statuspkg[1]) != packets.PACKET_HANDSHAKE {
-			server.LogError("mismatched packet id gaved by client")
-			return
-		}
-		statuspkg = nil
-
-		var status packets.HandShakeResponseStatus
-
-		status.Version.Name = server.CURRENT_VERSION
-		status.Version.ProtocolVersion = server.PROTOCOL_VERSION
-
-		status.Players.MaxPlayers = ServerData.MaxPlayers
-		status.Players.OnlinePlayers = 0
-		status.Players.PlayerStatus = []packets.PlayerMinimunInfo{}
-
-		if ServerData.ServerIcon == "" {
-			status.Favicon = ""
-		} else {
-			status.Favicon, err = GetBase64Image(ServerData.ServerIcon)
-			if err != nil {
-				server.LogError(err)
-				status.Favicon = ""
-			} else {
-				status.Favicon = fmt.Sprintf("data:image/png;base64,%s", status.Favicon)
-			}
-		}
-
-		status.Description.Text = ServerData.Motd
-
-		data, err := packets.MarshalPacket(&status, nil, -1)
-		if err != nil {
-			server.LogError(err)
-			return
-		}
-		conn.Write(data)
-
-		ping, err := packets.UnmarshalPacket(reader, -1)
-
-		if ping.ID() == packets.PACKET_PING_PONG {
-			data, err := packets.MarshalPacket(ping, nil, -1)
-			if err != nil {
-				server.LogError(err)
-				return
-			}
-			conn.Write(data)
-		}
-		return
 
 	case 2:
 		packets.RegisterPacket(packets.PACKET_ENCRYPTION_RESPONSE, func() packets.Packet {
@@ -605,19 +380,4 @@ func isConnAlive(conn net.Conn, makeDeadline time.Time) bool {
 	return false
 
 }
-
-func GetBase64Image(path string) (string, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("Can't find specified server image using none")
-		}
-		return "", err
-	}
-
-	if len(content) > 15360 {
-		server.LogWarn("The image server-icon is more than 15KB, this is not recommended!!!")
-	}
-
-	return base64.StdEncoding.EncodeToString(content), nil
-}
+*/

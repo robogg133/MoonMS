@@ -8,6 +8,9 @@ import (
 )
 
 func (s *Server) InitPlugins() {
+
+	_ = os.Mkdir("plugins", 0755)
+
 	allDirFiles, err := os.ReadDir(s.Config.PluginsFolder)
 	if err != nil {
 		s.LogError(err)
@@ -42,6 +45,7 @@ func (s *Server) InitPlugins() {
 		}
 
 		s.LogInfo(fmt.Sprintf("Starting %s", plugin.Identifier))
+		s.Plugins[plugin.Identifier] = plugin
 		go plugin.LoadPlugin()
 	}
 }

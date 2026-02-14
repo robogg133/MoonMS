@@ -2,6 +2,7 @@ package app
 
 import (
 	"MoonMS/internal/server"
+	"MoonMS/pkg/minecraft/world/seed"
 	"os"
 	"path/filepath"
 
@@ -32,8 +33,8 @@ type MinecraftServerConfig struct {
 		Difficulty    string `toml:"difficulty"`
 		Gamemode      string `toml:"default-gamemode"`
 		ForceGamemode bool   `toml:"force-gamemode"`
-		LevelName     string `toml:"level-name"`
-		Seed          string `toml:"level-seed"`
+		LevelName     string `toml:"level-name" `
+		Seed          int64  `toml:"level-seed"`
 		Hardcore      bool   `toml:"hardcore"`
 
 		MaxPlayer uint `toml:"max-players"`
@@ -63,18 +64,17 @@ type MinecraftServerConfig struct {
 		OfflineEncryption bool `toml:"offline-encryption"`
 
 		RSAKeyBitAmmount uint `toml:"rsa-key-bit-ammount"`
-		Threshold        uint `toml:"threshold"`
+		Threshold        int  `toml:"threshold"`
 	} `toml:"Advanced"`
-	ProtcolVersion int32
+	ProtcolVersion int32 `toml:",omitempty"`
 
-	MinecraftVersion string
+	MinecraftVersion string `toml:",omitempty"`
 }
 
 func (cfg *MinecraftServerConfig) ConfigFile() error {
-
+readAgain:
 	b, err := os.ReadFile(MAIN_CONFIG_FILE_PATH)
 	if err != nil {
-
 		if os.IsNotExist(err) {
 
 			_ = os.MkdirAll(filepath.Dir(MAIN_CONFIG_FILE_PATH), 0755)
@@ -92,13 +92,15 @@ func (cfg *MinecraftServerConfig) ConfigFile() error {
 			if err != nil {
 				return err
 			}
-
+			goto readAgain
 		}
-
+		return err
+	}
+	if err := toml.Unmarshal(b, &cfg); err != nil {
 		return err
 	}
 
-	toml.Unmarshal(b, &cfg)
+	cfg.ProtcolVersion = server.PROTOCOL_VERSION
 
 	return nil
 }
@@ -106,14 +108,13 @@ func (cfg *MinecraftServerConfig) ConfigFile() error {
 func getDefaultCfgFile() MinecraftServerConfig {
 
 	return MinecraftServerConfig{
-		ProtcolVersion: server.PROTOCOL_VERSION,
 		Proprieties: struct {
 			Motd               string  "toml:\"motd\""
 			Difficulty         string  "toml:\"difficulty\""
 			Gamemode           string  "toml:\"default-gamemode\""
 			ForceGamemode      bool    "toml:\"force-gamemode\""
-			LevelName          string  "toml:\"level-name\""
-			Seed               string  "toml:\"level-seed\""
+			LevelName          string  "toml:\"level-name\" "
+			Seed               int64   "toml:\"level-seed\""
 			Hardcore           bool    "toml:\"hardcore\""
 			MaxPlayer          uint    "toml:\"max-players\""
 			OnlineMode         bool    "toml:\"online-mode\""
@@ -132,6 +133,7 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			Gamemode:           GAMEMODE_SURVIVAL,
 			ForceGamemode:      false,
 			LevelName:          "world",
+			Seed:               seed.GenerateSeed(),
 			Hardcore:           false,
 			MaxPlayer:          20,
 			OnlineMode:         true,
@@ -143,6 +145,15 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			AllowEnd:           true,
 			TPS:                20.0,
 			Whitelist:          false,
+		},
+		Advanced: struct {
+			OfflineEncryption bool "toml:\"offline-encryption\""
+			RSAKeyBitAmmount  uint "toml:\"rsa-key-bit-ammount\""
+			Threshold         int  "toml:\"threshold\""
+		}{
+			OfflineEncryption: true,
+			RSAKeyBitAmmount:  2048,
+			Threshold:         256,
 		},
 	}
 }

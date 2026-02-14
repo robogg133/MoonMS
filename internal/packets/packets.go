@@ -25,20 +25,10 @@ type connStatus struct {
 	Threshold int
 }
 
-var packetRegistry = map[int32]func() Packet{}
+type KnownPackets map[int32]func() Packet
 
-func RegisterPacket(id int32, fn func() Packet) {
-	packetRegistry[id] = fn
-}
-
-func Init() {
-	RegisterPacket(PACKET_PING_PONG, func() Packet {
-		return &PingPong{}
-	})
-	RegisterPacket(PACKET_HANDSHAKE, func() Packet {
-		return &Handshake{}
-	})
-
+func (kpkg KnownPackets) RegisterPacket(id int32, fn func() Packet) {
+	kpkg[id] = fn
 }
 
 func MarshalPacket(p Packet, encryptionKey cipher.Stream, t int) ([]byte, error) {
@@ -111,7 +101,7 @@ func MarshalPacket(p Packet, encryptionKey cipher.Stream, t int) ([]byte, error)
 	return out.Bytes(), nil
 }
 
-func UnmarshalPacket(r *Reader, t int) (Packet, error) {
+func UnmarshalPacket(r *Reader, t int, packetRegistry KnownPackets) (Packet, error) {
 
 	data, err := r.ReadPrefixed()
 	if err != nil {

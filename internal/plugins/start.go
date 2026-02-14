@@ -174,6 +174,5 @@ func (p *Plugin) LoadPlugin() error {
 		}
 	}
 
-	AllPlugins = append(AllPlugins, *p)
 	return nil
 }
