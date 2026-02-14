@@ -47,7 +47,6 @@ func main() {
 	if err := server.StartLogger(); err != nil {
 		panic(err)
 	}
-	server.InitPlugins()
 
 	go func() {
 		sig := make(chan os.Signal, 1)
