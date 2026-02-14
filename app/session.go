@@ -3,6 +3,7 @@ package app
 import (
 	"MoonMS/internal/packets"
 	"crypto/cipher"
+	"errors"
 	"net"
 )
 
@@ -14,8 +15,11 @@ type Session struct {
 
 	ClientProtocolVersion int32
 
-	Threshold int
-	Stream    cipher.Stream
+	Threshold     int32
+	EncryptCipher cipher.Stream
+	DecryptCipher cipher.Stream
+
+	stop bool
 
 	State State
 }
@@ -25,10 +29,19 @@ type State interface {
 	Handle(*Session) error
 }
 
+var (
+	ErrNoReason = errors.New("disconnect")
+)
+
 func (s *Session) Run() error {
 	for {
 		if err := s.State.Handle(s); err != nil {
-			return err
+			switch err {
+			case ErrNoReason:
+				return nil
+			default:
+				return err
+			}
 		}
 	}
 }
@@ -47,14 +60,16 @@ func NewSession(conn net.Conn, server *Server) *Session {
 		PkgReader: packets.NewReaderFromReader(conn),
 		KnownPkgs: kpkg,
 
+		EncryptCipher: nil,
+		DecryptCipher: nil,
+
 		Threshold: -1,
-		Stream:    nil,
 		State:     &HandshakeState{},
 	}
 }
 
 func (s *Session) WritePacket(p packets.Packet) error {
-	b, err := packets.MarshalPacket(p, s.Stream, s.Threshold)
+	b, err := packets.MarshalPacket(p, s.EncryptCipher, s.Threshold)
 	if err != nil {
 		return err
 	}

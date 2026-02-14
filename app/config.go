@@ -1,7 +1,6 @@
 package app
 
 import (
-	"MoonMS/internal/server"
 	"MoonMS/pkg/minecraft/world/seed"
 	"os"
 	"path/filepath"
@@ -63,8 +62,8 @@ type MinecraftServerConfig struct {
 	Advanced struct {
 		OfflineEncryption bool `toml:"offline-encryption"`
 
-		RSAKeyBitAmmount uint `toml:"rsa-key-bit-ammount"`
-		Threshold        int  `toml:"threshold"`
+		RSAKeyBitAmmount uint  `toml:"rsa-key-bit-ammount"`
+		Threshold        int32 `toml:"threshold"`
 	} `toml:"Advanced"`
 	ProtcolVersion int32 `toml:",omitempty"`
 
@@ -100,7 +99,7 @@ readAgain:
 		return err
 	}
 
-	cfg.ProtcolVersion = server.PROTOCOL_VERSION
+	cfg.ProtcolVersion = 774
 
 	return nil
 }
@@ -147,9 +146,9 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			Whitelist:          false,
 		},
 		Advanced: struct {
-			OfflineEncryption bool "toml:\"offline-encryption\""
-			RSAKeyBitAmmount  uint "toml:\"rsa-key-bit-ammount\""
-			Threshold         int  "toml:\"threshold\""
+			OfflineEncryption bool  "toml:\"offline-encryption\""
+			RSAKeyBitAmmount  uint  "toml:\"rsa-key-bit-ammount\""
+			Threshold         int32 "toml:\"threshold\""
 		}{
 			OfflineEncryption: true,
 			RSAKeyBitAmmount:  2048,

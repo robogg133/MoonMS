@@ -6,7 +6,9 @@ import (
 )
 
 const (
-	INTENT_STATUS int32 = 1
+	INTENT_STATUS   int32 = 1
+	INTENT_LOGIN    int32 = 2
+	INTENT_TRANSFER int32 = 3
 )
 const STATE_NAME_HANDSHAKE = "handshake"
 
@@ -31,6 +33,8 @@ func (s *HandshakeState) Handle(sess *Session) error {
 	switch pkg.(*packets.Handshake).Intent {
 	case INTENT_STATUS:
 		sess.State = &StatusState{}
+	case INTENT_LOGIN:
+		sess.State = &LoginState{}
 	}
 	return nil
 }

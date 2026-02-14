@@ -31,7 +31,7 @@ func (kpkg KnownPackets) RegisterPacket(id int32, fn func() Packet) {
 	kpkg[id] = fn
 }
 
-func MarshalPacket(p Packet, encryptionKey cipher.Stream, t int) ([]byte, error) {
+func MarshalPacket(p Packet, encryptionKey cipher.Stream, t int32) ([]byte, error) {
 	body := NewWriter()
 
 	body.WriteVarInt(p.ID())
@@ -42,7 +42,7 @@ func MarshalPacket(p Packet, encryptionKey cipher.Stream, t int) ([]byte, error)
 	out := NewWriter()
 	if t > -1 {
 
-		if body.Len() < t {
+		if int32(body.Len()) < t {
 			if err := out.WriteVarInt(int32(body.Len()) + 1); err != nil { // +1 For data Length
 				return nil, err
 			}
@@ -101,7 +101,7 @@ func MarshalPacket(p Packet, encryptionKey cipher.Stream, t int) ([]byte, error)
 	return out.Bytes(), nil
 }
 
-func UnmarshalPacket(r *Reader, t int, packetRegistry KnownPackets) (Packet, error) {
+func UnmarshalPacket(r *Reader, t int32, packetRegistry KnownPackets) (Packet, error) {
 
 	data, err := r.ReadPrefixed()
 	if err != nil {

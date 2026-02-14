@@ -2,7 +2,6 @@ package app
 
 import (
 	"MoonMS/internal/packets"
-	"MoonMS/internal/server"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -12,13 +11,14 @@ const STATE_NAME_STATUS = "status"
 
 type StatusState struct{}
 
-func (s StatusState) Name() string { return "status" }
+func (s StatusState) Name() string { return STATE_NAME_STATUS }
 
 func (s *StatusState) Handle(sess *Session) error {
 
 	statuspkg, err := packets.ReadPackageFromConnecion(sess.Conn)
 	if err != nil {
-		return err
+		sess.Server.LogDebug("error reading ", err)
+		return ErrNoReason
 	}
 
 	if int32(statuspkg[1]) != packets.PACKET_HANDSHAKE {
@@ -29,7 +29,7 @@ func (s *StatusState) Handle(sess *Session) error {
 
 	var status packets.HandShakeResponseStatus
 
-	status.Version.Name = server.CURRENT_VERSION
+	status.Version.Name = "1.21.11"
 	status.Version.ProtocolVersion = sess.Server.MinecraftConfig.ProtcolVersion
 
 	status.Players.MaxPlayers = sess.Server.MinecraftConfig.Proprieties.MaxPlayer
@@ -41,7 +41,7 @@ func (s *StatusState) Handle(sess *Session) error {
 	} else {
 		status.Favicon, err = getBase64Image(sess.Server.MinecraftConfig.Proprieties.ServerIcon)
 		if err != nil {
-			server.LogError(err)
+			sess.Server.LogError(err)
 			status.Favicon = ""
 		} else {
 			status.Favicon = fmt.Sprintf("data:image/png;base64,%s", status.Favicon)
@@ -57,7 +57,8 @@ func (s *StatusState) Handle(sess *Session) error {
 	sess.KnownPkgs.RegisterPacket(packets.PACKET_PING_PONG, func() packets.Packet { return &packets.PingPong{} })
 	ping, err := sess.ReadPacket()
 	if err != nil {
-		return err
+		sess.Server.LogDebug("error reading ping")
+		return nil
 	}
 
 	if ping.ID() == packets.PACKET_PING_PONG {
@@ -65,7 +66,8 @@ func (s *StatusState) Handle(sess *Session) error {
 			return err
 		}
 	}
-	return nil
+
+	return sess.Conn.Close()
 }
 
 func getBase64Image(path string) (string, error) {

@@ -1,14 +1,11 @@
 package app
 
 import (
-	"MoonMS/internal/plugins"
 	"crypto/rsa"
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"runtime/debug"
-	"sync"
 )
 
 type Server struct {
@@ -18,7 +15,7 @@ type Server struct {
 
 	Config Config
 
-	Plugins       map[string]plugins.Plugin
+	//Plugins       map[string]plugins.Plugin
 	OnlinePlayers uint32
 
 	ServerPrivateKey *rsa.PrivateKey
@@ -26,9 +23,9 @@ type Server struct {
 
 func New(m MinecraftServerConfig, cfg Config, sk *rsa.PrivateKey) *Server {
 	return &Server{
-		MinecraftConfig:  m,
-		Config:           cfg,
-		Plugins:          make(map[string]plugins.Plugin),
+		MinecraftConfig: m,
+		Config:          cfg,
+		//Plugins:          make(map[string]plugins.Plugin),
 		ServerPrivateKey: sk,
 	}
 }
@@ -48,7 +45,6 @@ func (s *Server) Start() {
 		if r := recover(); r != nil {
 			s.LogPanic(fmt.Sprintf("SERVER CRASH: %v\n%s", r, debug.Stack()))
 			s.Stop()
-			os.Exit(1)
 		}
 	}()
 
@@ -76,20 +72,21 @@ func (s *Server) Start() {
 
 func (s *Server) handleConn(conn net.Conn) {
 	s.LogDebug(fmt.Sprintf("got connection from %s", conn.RemoteAddr().String()))
+
+	defer func() {
+		if r := recover(); r != nil {
+			s.LogPanic(fmt.Sprintf("CLOSING CONNECTION WITH %s: %v\n%s", conn.RemoteAddr().String(), r, debug.Stack()))
+		}
+	}()
+
 	sess := NewSession(conn, s)
 
-	sess.Run()
+	if err := sess.Run(); err != nil {
+		s.LogError(err)
+	}
 }
 
 func (s *Server) Stop() error {
 
-	var wg sync.WaitGroup
-
-	for _, plg := range s.Plugins {
-		wg.Add(1)
-		go plg.RunEventServerStopping(&wg)
-	}
-
-	wg.Wait()
 	return nil
 }

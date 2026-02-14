@@ -1,12 +1,6 @@
 package app
 
-import (
-	"MoonMS/internal/plugins"
-	"fmt"
-	"os"
-	"path/filepath"
-)
-
+/*
 func (s *Server) InitPlugins() {
 
 	_ = os.Mkdir("plugins", 0755)
@@ -49,3 +43,4 @@ func (s *Server) InitPlugins() {
 		go plugin.LoadPlugin()
 	}
 }
+*/

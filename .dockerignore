@@ -1,0 +1,8 @@
+.git*
+*.txt
+*.toml
+*.png
+*.toml
+*.key
+*.pem
+logs/
