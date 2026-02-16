@@ -1,9 +1,6 @@
 package app
 
 import (
-	"MoonMS/internal/datatypes"
-	"MoonMS/internal/offline"
-	"MoonMS/internal/packets"
 	"bytes"
 	"crypto/aes"
 	"crypto/rand"
@@ -15,6 +12,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/robogg133/KernelCraft/internal/offline"
+
+	"github.com/robogg133/KernelCraft/internal/packets"
+
+	"github.com/robogg133/KernelCraft/internal/datatypes"
 
 	"github.com/Tnze/go-mc/net/CFB8"
 	"github.com/google/uuid"
@@ -34,11 +37,16 @@ type MojangAnswer struct {
 func (s *LoginState) Name() string { return STATE_NAME_LOGIN }
 
 func (s *LoginState) Handle(sess *Session) error {
+	sess.Server.LogDebug("START STATE LOGIN")
+
 	// Registering Encryption response
 	new := make(packets.KnownPackets)
-	new[packets.PACKET_ENCRYPTION_RESPONSE] = func() packets.Packet {
+	new.RegisterPacket(packets.PACKET_ENCRYPTION_RESPONSE, func() packets.Packet {
 		return &packets.EncryptionResponse{}
-	}
+	})
+	new.RegisterPacket(packets.PACKET_LOGIN_ACKNOWLEDGED, func() packets.Packet {
+		return &packets.LoginAcknowledgedPacket{}
+	})
 	sess.KnownPkgs = new
 	// Starting to read basic info like uuid and username
 	buff, err := packets.ReadPackageFromConnecion(sess.Conn)
@@ -105,8 +113,7 @@ func (s *LoginState) Handle(sess *Session) error {
 		if err != nil {
 			if err == ErrInvalidSession {
 				// Need to kick msg
-				sess.Conn.Close()
-				return nil
+				return ErrNoReason
 			} else {
 				sess.Server.LogDebug("what happned here?")
 				return err
@@ -151,8 +158,25 @@ func (s *LoginState) Handle(sess *Session) error {
 		loginSucc.Profile.Signature = signature
 	}
 
-	sess.Server.LogDebug("Sending Login success")
-	return sess.WritePacket(&loginSucc)
+	if err = sess.WritePacket(&loginSucc); err != nil {
+		return err
+	}
+	sess.Server.LogDebug("Sent Login success")
+
+	ak, err := sess.ReadPacket()
+	if err != nil {
+		return err
+	}
+
+	if ak.ID() != packets.PACKET_LOGIN_ACKNOWLEDGED {
+		sess.Server.LogDebug("Protocol violation")
+		return ErrNoReason
+	}
+	sess.Server.LogDebug("Login acknowledged")
+
+	sess.State = &ConfigState{}
+
+	return err
 }
 
 func setupEncryption(sess *Session) (encKey, decKey *CFB8.CFB8, usernameHex string, err error) {

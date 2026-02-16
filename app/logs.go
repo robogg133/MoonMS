@@ -56,9 +56,7 @@ func (s *Server) LogPlugin(pluginName string, args ...any) {
 
 func (s *Server) StartLogger() error {
 
-	if err := enable(); err != nil {
-		return err
-	}
+	enable()
 
 	_ = os.MkdirAll(filepath.Dir(s.Config.LatestLogFile), 0755)
 

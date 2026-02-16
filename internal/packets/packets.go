@@ -1,12 +1,13 @@
 package packets
 
 import (
-	"MoonMS/internal/datatypes"
 	"bytes"
 	"compress/zlib"
 	"crypto/cipher"
 	"fmt"
 	"io"
+
+	"github.com/robogg133/KernelCraft/internal/datatypes"
 )
 
 const (

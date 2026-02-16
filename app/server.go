@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
+
+	"github.com/robogg133/KernelCraft/internal/packets"
 )
 
 type Server struct {
@@ -17,6 +19,8 @@ type Server struct {
 
 	//Plugins       map[string]plugins.Plugin
 	OnlinePlayers uint32
+
+	PlayerList []packets.PlayerListInfo
 
 	ServerPrivateKey *rsa.PrivateKey
 }

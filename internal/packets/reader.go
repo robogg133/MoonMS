@@ -1,11 +1,12 @@
 package packets
 
 import (
-	"MoonMS/internal/datatypes"
 	"bytes"
 	"encoding/binary"
 	"io"
 	"math"
+
+	"github.com/robogg133/KernelCraft/internal/datatypes"
 )
 
 type Reader struct {

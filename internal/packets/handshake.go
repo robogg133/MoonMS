@@ -42,7 +42,7 @@ func (h *Handshake) Decode(r *Reader) error {
 	return nil
 }
 
-type PlayerMinimunInfo struct {
+type PlayerListInfo struct {
 	Username string `json:"name"`
 	UUID     string `json:"id"`
 }
@@ -54,9 +54,9 @@ type HandShakeResponseStatus struct {
 	} `json:"version"`
 
 	Players struct {
-		MaxPlayers    uint                `json:"max"`
-		OnlinePlayers uint32              `json:"online"`
-		PlayerStatus  []PlayerMinimunInfo `json:"sample"`
+		MaxPlayers    uint             `json:"max"`
+		OnlinePlayers uint32           `json:"online"`
+		PlayerStatus  []PlayerListInfo `json:"sample"`
 	} `json:"players"`
 
 	Description struct {

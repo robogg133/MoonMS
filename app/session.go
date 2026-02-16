@@ -1,10 +1,11 @@
 package app
 
 import (
-	"MoonMS/internal/packets"
 	"crypto/cipher"
 	"errors"
 	"net"
+
+	"github.com/robogg133/KernelCraft/internal/packets"
 )
 
 type Session struct {
@@ -20,6 +21,8 @@ type Session struct {
 	DecryptCipher cipher.Stream
 
 	stop bool
+
+	PlayerInformation *packets.ClientInformationPacket
 
 	State State
 }

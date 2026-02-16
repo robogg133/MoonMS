@@ -1,10 +1,11 @@
 package packets
 
 import (
-	"MoonMS/internal/datatypes"
 	"bytes"
 	"fmt"
 	"net"
+
+	"github.com/robogg133/KernelCraft/internal/datatypes"
 )
 
 func ReadPackageFromConnecion(conn net.Conn) ([]byte, error) {

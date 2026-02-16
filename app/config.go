@@ -1,9 +1,10 @@
 package app
 
 import (
-	"MoonMS/pkg/minecraft/world/seed"
 	"os"
 	"path/filepath"
+
+	"github.com/robogg133/KernelCraft/pkg/minecraft/world/seed"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -46,9 +47,9 @@ type MinecraftServerConfig struct {
 
 		ServerPort uint16 `toml:"server-port"`
 
-		ViewDistance uint16 `toml:"view-distance"`
+		ViewDistance uint8 `toml:"view-distance"`
 
-		SimluationDistance uint16 `toml:"simulation-distance"`
+		SimluationDistance uint8 `toml:"simulation-distance"`
 
 		AllowNether bool `toml:"allow-nether"`
 
@@ -120,8 +121,8 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			AllowServerList    bool    "toml:\"allow-server-list\""
 			ServerIcon         string  "toml:\"sever-icon-path\""
 			ServerPort         uint16  "toml:\"server-port\""
-			ViewDistance       uint16  "toml:\"view-distance\""
-			SimluationDistance uint16  "toml:\"simulation-distance\""
+			ViewDistance       uint8   "toml:\"view-distance\""
+			SimluationDistance uint8   "toml:\"simulation-distance\""
 			AllowNether        bool    "toml:\"allow-nether\""
 			AllowEnd           bool    "toml:\"allow-end\""
 			TPS                float32 "toml:\"tps\""

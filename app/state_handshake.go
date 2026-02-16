@@ -1,8 +1,9 @@
 package app
 
 import (
-	"MoonMS/internal/packets"
 	"fmt"
+
+	"github.com/robogg133/KernelCraft/internal/packets"
 )
 
 const (

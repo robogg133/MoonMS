@@ -1,9 +1,10 @@
 package registrys
 
 import (
-	"MoonMS/internal/datatypes"
-	"MoonMS/internal/packets"
 	"bytes"
+
+	"github.com/robogg133/KernelCraft/internal/datatypes"
+	"github.com/robogg133/KernelCraft/internal/packets"
 )
 
 type RegistryData struct {

@@ -1,9 +1,10 @@
 package seed_test
 
 import (
-	"MoonMS/pkg/minecraft/world/seed"
 	"fmt"
 	"testing"
+
+	"github.com/robogg133/KernelCraft/pkg/minecraft/world/seed"
 )
 
 func TestGenerate(t *testing.T) {

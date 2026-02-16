@@ -2,28 +2,31 @@ package main
 
 import (
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 )
 
-const (
-	listenAddr = "127.0.0.1:25565"
-	serverAddr = "127.0.0.1:3023"
-)
+var listenAddr, serverAddr string
 
 func main() {
+
+	flag.StringVar(&listenAddr, "listen-address", "127.0.0.1:25565", "Address that the proxy will listen")
+	flag.StringVar(&serverAddr, "server-address", "127.0.0.1:3032", "Address that will be proxied")
+	flag.Parse()
+
 	ln, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Proxy escutando em", listenAddr)
+	log.Println("Listening all connections on", listenAddr)
 
 	for {
 		clientConn, err := ln.Accept()
 		if err != nil {
-			log.Println("Erro ao aceitar:", err)
+			log.Println("error accepting:", err)
 			continue
 		}
 

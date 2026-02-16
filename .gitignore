@@ -9,3 +9,4 @@
 *.log
 *.gz
 access/
+!plugin-example.yml

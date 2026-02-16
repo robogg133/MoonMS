@@ -1,13 +1,13 @@
 package main
 
 import (
-	"MoonMS/app"
-	"MoonMS/internal/packets"
 	"crypto/rand"
 	"crypto/rsa"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/robogg133/KernelCraft/app"
 
 	_ "embed"
 )
@@ -17,8 +17,6 @@ const DEADLINE = time.Second * 30
 type MojangAnswer struct {
 	Properties []map[string]string
 }
-
-var AnonymousPlayer = &packets.PlayerMinimunInfo{Username: "Anonymous Player", UUID: "00000000-0000-0000-0000-000000000000"}
 
 func main() {
 

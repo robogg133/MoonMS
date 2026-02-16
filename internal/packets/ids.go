@@ -1,9 +1,0 @@
-package packets
-
-const (
-	PACKET_LOGIN_AKNOWLEDGED int32 = 0x03
-
-	PACKET_LOGIN_DISCONNECT int32 = 0x00
-
-	PACKET_REGISTRY_DATA int32 = 0x07
-)

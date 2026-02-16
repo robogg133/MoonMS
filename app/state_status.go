@@ -1,10 +1,11 @@
 package app
 
 import (
-	"MoonMS/internal/packets"
 	"encoding/base64"
 	"fmt"
 	"os"
+
+	"github.com/robogg133/KernelCraft/internal/packets"
 )
 
 const STATE_NAME_STATUS = "status"
@@ -14,6 +15,7 @@ type StatusState struct{}
 func (s StatusState) Name() string { return STATE_NAME_STATUS }
 
 func (s *StatusState) Handle(sess *Session) error {
+	sess.Server.LogDebug("START STATE STATUS")
 
 	statuspkg, err := packets.ReadPackageFromConnecion(sess.Conn)
 	if err != nil {
@@ -34,7 +36,7 @@ func (s *StatusState) Handle(sess *Session) error {
 
 	status.Players.MaxPlayers = sess.Server.MinecraftConfig.Proprieties.MaxPlayer
 	status.Players.OnlinePlayers = sess.Server.OnlinePlayers
-	status.Players.PlayerStatus = []packets.PlayerMinimunInfo{}
+	status.Players.PlayerStatus = []packets.PlayerListInfo{}
 
 	if sess.Server.MinecraftConfig.Proprieties.ServerIcon == "" {
 		status.Favicon = ""
