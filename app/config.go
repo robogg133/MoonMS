@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/robogg133/KernelCraft/pkg/minecraft/world/seed"
+	"github.com/robogg133/MoonMS/pkg/minecraft/world/seed"
 
 	"github.com/pelletier/go-toml/v2"
 )

@@ -1,4 +1,4 @@
-module github.com/robogg133/KernelCraft
+module github.com/robogg133/MoonMS
 
 go 1.25.4
 

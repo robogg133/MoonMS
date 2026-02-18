@@ -13,11 +13,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/robogg133/KernelCraft/internal/offline"
+	"github.com/robogg133/MoonMS/internal/offline"
 
-	"github.com/robogg133/KernelCraft/internal/packets"
+	"github.com/robogg133/MoonMS/internal/packets"
 
-	"github.com/robogg133/KernelCraft/internal/datatypes"
+	"github.com/robogg133/MoonMS/internal/datatypes"
 
 	"github.com/Tnze/go-mc/net/CFB8"
 	"github.com/google/uuid"

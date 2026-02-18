@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/robogg133/KernelCraft/internal/packets"
+	"github.com/robogg133/MoonMS/internal/packets"
 )
 
 const STATE_NAME_CONFIG = "config"

@@ -10,3 +10,5 @@
 *.gz
 access/
 !plugin-example.yml
+*.lock
+dist/

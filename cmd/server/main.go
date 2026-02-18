@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/robogg133/KernelCraft/app"
+	"github.com/robogg133/MoonMS/app"
 
 	_ "embed"
 )

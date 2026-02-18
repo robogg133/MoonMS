@@ -3,7 +3,7 @@ package parser
 import (
 	"encoding/json"
 
-	"github.com/robogg133/KernelCraft/data"
+	"github.com/robogg133/MoonMS/data"
 )
 
 func decodeGameplay_SnowGolemMelts(a json.RawMessage) (Attribute, error) {

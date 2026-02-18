@@ -6,7 +6,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/robogg133/KernelCraft/internal/datatypes"
+	"github.com/robogg133/MoonMS/internal/datatypes"
 )
 
 type Reader struct {

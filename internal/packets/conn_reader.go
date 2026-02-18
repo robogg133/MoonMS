@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/robogg133/KernelCraft/internal/datatypes"
+	"github.com/robogg133/MoonMS/internal/datatypes"
 )
 
 func ReadPackageFromConnecion(conn net.Conn) ([]byte, error) {

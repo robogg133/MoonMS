@@ -3,7 +3,7 @@ package parser
 import (
 	"encoding/json"
 
-	"github.com/robogg133/KernelCraft/data"
+	"github.com/robogg133/MoonMS/data"
 )
 
 func decodeAudio_BackgroundMusic(a json.RawMessage) (Attribute, error) {
