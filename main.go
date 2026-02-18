@@ -25,6 +25,9 @@ func main() {
 		panic(err)
 	}
 
+	cfg.MinecraftVersion = "1.21.11"
+	cfg.ProtcolVersion = 774
+
 	scfg := app.Config{
 		LatestLogFile: "logs/latest.log",
 		StartName:     "java",

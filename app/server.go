@@ -56,7 +56,7 @@ func (s *Server) Start() {
 		panic(err)
 	}
 
-	s.LogInfo(fmt.Sprintf("Starting minecraft %s server on port: %d", s.Config.StartName, s.MinecraftConfig.Proprieties.ServerPort))
+	s.LogInfo(fmt.Sprintf("Starting minecraft %s server on port: %d  (VERSION: %s)", s.Config.StartName, s.MinecraftConfig.Proprieties.ServerPort, s.MinecraftConfig.MinecraftVersion))
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.MinecraftConfig.Proprieties.ServerPort))
 	if err != nil {
 		panic(err)

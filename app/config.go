@@ -100,8 +100,6 @@ readAgain:
 		return err
 	}
 
-	cfg.ProtcolVersion = 774
-
 	return nil
 }
 

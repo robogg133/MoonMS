@@ -31,7 +31,7 @@ func (s *StatusState) Handle(sess *Session) error {
 
 	var status packets.HandShakeResponseStatus
 
-	status.Version.Name = "1.21.11"
+	status.Version.Name = sess.Server.MinecraftConfig.MinecraftVersion
 	status.Version.ProtocolVersion = sess.Server.MinecraftConfig.ProtcolVersion
 
 	status.Players.MaxPlayers = sess.Server.MinecraftConfig.Proprieties.MaxPlayer
