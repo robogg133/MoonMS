@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/robogg133/KernelCraft/pkg/minecraft/world/seed"
+	"github.com/robogg133/MoonMS/pkg/minecraft/world/seed"
 )
 
 func TestGenerate(t *testing.T) {
