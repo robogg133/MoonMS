@@ -1,46 +1,37 @@
 package app
 
-/*
-func (s *Server) InitPlugins() {
+import (
+	"fmt"
+	"os"
+	"path/filepath"
 
-	_ = os.Mkdir("plugins", 0755)
+	"github.com/robogg133/MoonMS/plugin"
+)
+
+func (s *Server) InitPlugins() {
 
 	allDirFiles, err := os.ReadDir(s.Config.PluginsFolder)
 	if err != nil {
 		s.LogError(err)
 	}
+	plugin.SetPluginsFolder(s.Config.PluginsFolder)
 
 	for _, d := range allDirFiles {
 		if d.IsDir() {
 			continue
 		}
 
-		path := filepath.Join("plugins", d.Name())
+		path := filepath.Join(s.Config.PluginsFolder, d.Name())
 
-		f, err := os.Open(path)
-		if err != nil {
-			s.LogError(fmt.Sprintf("Error opening file: %v", err))
-			s.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
-			continue
-		}
+		pl := plugin.NewPlugin(path)
 
-		stat, err := f.Stat()
-		if err != nil {
-			s.LogError(fmt.Sprintf("Error getting file status: %v", err))
-			s.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
-			continue
-		}
+		s.LogInfo(fmt.Sprintf("Starting %s", pl.Meta.Identifier))
 
-		plugin, err := plugins.ReadPluginFile(f, stat.Size(), path)
-		if err != nil {
-			s.LogError(fmt.Sprintf("Error parsing plugin: %v", err))
-			s.LogInfo(fmt.Sprintf("SKIPPING %v", d.Name()))
-			continue
-		}
+		defer func() {
+			r := recover()
+			s.LogError(fmt.Sprintf("plugin %s failed to load: %v", pl.Meta.Name, r))
+		}()
 
-		s.LogInfo(fmt.Sprintf("Starting %s", plugin.Identifier))
-		s.Plugins[plugin.Identifier] = plugin
-		go plugin.LoadPlugin()
+		go pl.Load()
 	}
 }
-*/

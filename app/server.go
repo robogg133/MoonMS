@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 
 	"github.com/robogg133/MoonMS/internal/packets"
+	"github.com/robogg133/MoonMS/plugin"
 )
 
 type Server struct {
@@ -17,7 +18,7 @@ type Server struct {
 
 	Config Config
 
-	//Plugins       map[string]plugins.Plugin
+	Plugins       map[string]plugin.Plugin
 	OnlinePlayers uint32
 
 	PlayerList []packets.PlayerListInfo
