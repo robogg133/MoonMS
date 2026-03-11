@@ -20,12 +20,11 @@ func (s *ConfigState) Handle(sess *Session) error {
 	new.RegisterPacket(packets.PACKET_CLIENT_INFORMATION, func() packets.Packet {
 		return &packets.ClientInformationPacket{}
 	})
-	new.RegisterPacket(packets.PACKET_SERVERBOUND_PLUGIN_MESSAGE, func() packets.Packet {
+	new.RegisterPacket(packets.PACKET_PLUGIN_MESSAGE, func() packets.Packet {
 		return &packets.ServerBoundPluginMessagePacket{}
 	})
 	sess.KnownPkgs = new
 
-readPacketAgain:
 	p, err := sess.ReadPacket()
 	if err != nil {
 		return err
@@ -37,13 +36,12 @@ readPacketAgain:
 
 		sess.PlayerInformation = cliInfo
 
-		fmt.Println(sess.PlayerInformation)
+		sess.Server.LogDebug(sess.PlayerInformation)
 
 	case 2:
 		aff := p.(*packets.ServerBoundPluginMessagePacket)
 		sess.Server.LogDebug(fmt.Sprintf("first server_bound_plugin_message, identifier: %s", aff.Identifier))
 		sess.Server.LogDebug(fmt.Sprintf("first server_bound_plugin_message, data: %s ", hex.Dump(aff.Data)))
-		goto readPacketAgain
 	}
 
 	/*

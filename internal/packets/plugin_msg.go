@@ -2,16 +2,24 @@ package packets
 
 import "io"
 
-const PACKET_SERVERBOUND_PLUGIN_MESSAGE int32 = 2
+const PACKET_PLUGIN_MESSAGE int32 = 2
 
 type ServerBoundPluginMessagePacket struct {
 	Identifier string
 	Data       []byte
 }
 
-func (*ServerBoundPluginMessagePacket) ID() int32 { return PACKET_SERVERBOUND_PLUGIN_MESSAGE }
+func (*ServerBoundPluginMessagePacket) ID() int32 { return PACKET_PLUGIN_MESSAGE }
 
-func (s *ServerBoundPluginMessagePacket) Encode(w *Writer) error { return nil }
+func (s *ServerBoundPluginMessagePacket) Encode(w *Writer) error {
+
+	if err := w.WriteString(s.Identifier); err != nil {
+		return err
+	}
+
+	err := w.Write(s.Data)
+	return err
+}
 
 func (s *ServerBoundPluginMessagePacket) Decode(r *Reader) error {
 
