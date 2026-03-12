@@ -4,14 +4,14 @@ import "io"
 
 const PACKET_PLUGIN_MESSAGE int32 = 2
 
-type ServerBoundPluginMessagePacket struct {
+type PluginMessagePacket struct {
 	Identifier string
 	Data       []byte
 }
 
-func (*ServerBoundPluginMessagePacket) ID() int32 { return PACKET_PLUGIN_MESSAGE }
+func (*PluginMessagePacket) ID() int32 { return PACKET_PLUGIN_MESSAGE }
 
-func (s *ServerBoundPluginMessagePacket) Encode(w *Writer) error {
+func (s *PluginMessagePacket) Encode(w *Writer) error {
 
 	if err := w.WriteString(s.Identifier); err != nil {
 		return err
@@ -21,7 +21,7 @@ func (s *ServerBoundPluginMessagePacket) Encode(w *Writer) error {
 	return err
 }
 
-func (s *ServerBoundPluginMessagePacket) Decode(r *Reader) error {
+func (s *PluginMessagePacket) Decode(r *Reader) error {
 
 	var err error
 	s.Identifier, err = r.ReadString()

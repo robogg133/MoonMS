@@ -21,7 +21,7 @@ func (s *ConfigState) Handle(sess *Session) error {
 		return &packets.ClientInformationPacket{}
 	})
 	new.RegisterPacket(packets.PACKET_PLUGIN_MESSAGE, func() packets.Packet {
-		return &packets.ServerBoundPluginMessagePacket{}
+		return &packets.PluginMessagePacket{}
 	})
 	sess.KnownPkgs = new
 
@@ -38,8 +38,8 @@ func (s *ConfigState) Handle(sess *Session) error {
 
 		sess.Server.LogDebug(sess.PlayerInformation)
 
-	case 2:
-		aff := p.(*packets.ServerBoundPluginMessagePacket)
+	case packets.PACKET_PLUGIN_MESSAGE:
+		aff := p.(*packets.PluginMessagePacket)
 		sess.Server.LogDebug(fmt.Sprintf("first server_bound_plugin_message, identifier: %s", aff.Identifier))
 		sess.Server.LogDebug(fmt.Sprintf("first server_bound_plugin_message, data: %s ", hex.Dump(aff.Data)))
 	}
