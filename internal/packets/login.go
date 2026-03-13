@@ -57,9 +57,6 @@ type LoginAcknowledgedPacket struct{}
 
 func (l *LoginAcknowledgedPacket) ID() int32 { return PACKET_LOGIN_ACKNOWLEDGED }
 
-func (l *LoginAcknowledgedPacket) Encode(w *Writer) error {
-	err := w.WriteVarInt(PACKET_LOGIN_ACKNOWLEDGED)
-	return err
-}
+func (l *LoginAcknowledgedPacket) Encode(w *Writer) error { return nil }
 
 func (l *LoginAcknowledgedPacket) Decode(r *Reader) error { return nil }
