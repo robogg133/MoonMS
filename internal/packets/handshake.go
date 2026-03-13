@@ -79,4 +79,9 @@ func (h *HandShakeResponseStatus) Encode(w *Writer) error {
 	return w.WritePrefixed(statusSerialized)
 }
 
-func (h *HandShakeResponseStatus) Decode(r *Reader) error { return nil }
+func (h *HandShakeResponseStatus) Decode(r *Reader) error {
+
+	jsonDecoder := json.NewDecoder(r)
+
+	return jsonDecoder.Decode(h)
+}
