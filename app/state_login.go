@@ -12,8 +12,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/robogg133/MoonMS/internal/offline"
+	"github.com/robogg133/MoonMS/internal/shared"
 
 	"github.com/robogg133/MoonMS/internal/packets"
 
@@ -88,7 +90,8 @@ func (s *LoginState) Handle(sess *Session) error {
 		playerUUID = offline.NameToUUID(string(playerName))
 	}
 
-	sess.Server.LogInfo(fmt.Sprintf("Received connection from %s as %s (%s)", sess.Conn.RemoteAddr().String(), string(playerName), playerUUID.String()))
+	sess.Server.LogInfo("Received connection from %s as %s (%s)", sess.Conn.RemoteAddr().String(), string(playerName), playerUUID.String())
+
 	var usernameCode string
 	if sess.Server.MinecraftConfig.Proprieties.OnlineMode || sess.Server.MinecraftConfig.Advanced.OfflineEncryption {
 
@@ -106,13 +109,56 @@ func (s *LoginState) Handle(sess *Session) error {
 		sess.Server.LogDebug("Sent compress Start")
 		sess.Threshold = sess.Server.MinecraftConfig.Advanced.Threshold
 	}
+
+	if sess.Server.IsBanned(playerUUID.String()) {
+		// If is banned
+		sess.Server.LogDebug("%s is banned (%s)", string(playerName), playerUUID.String())
+		var a packets.LoginDisconnectPacket
+		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_BANNED)))
+
+		if err := sess.WritePacket(&a); err != nil {
+			sess.Server.LogError("%v", err)
+		}
+
+		return ErrNoReason
+	} else if sess.Server.IsBanned(strings.Split(sess.Conn.RemoteAddr().String(), ":")[1]) {
+		// If is ip banned
+		sess.Server.LogDebug("%s is ip banned (%s) IP: %s ", string(playerName), playerUUID.String(), strings.Split(sess.Conn.RemoteAddr().String(), ":")[1])
+
+		var a packets.LoginDisconnectPacket
+		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_IP_BANNED)))
+
+		if err := sess.WritePacket(&a); err != nil {
+			sess.Server.LogError("%v", err)
+		}
+
+		return ErrNoReason
+	} else if sess.Server.MinecraftConfig.Proprieties.Whitelist {
+		if !sess.Server.IsWhitelisted(playerUUID.String()) {
+			// if not whitelisted
+
+			var a packets.LoginDisconnectPacket
+			a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_NOT_WHITELISTED)))
+
+			if err := sess.WritePacket(&a); err != nil {
+				sess.Server.LogError("%v", err)
+			}
+			return ErrNoReason
+		}
+	}
+
 	var resp MojangAnswer
 
 	if sess.Server.MinecraftConfig.Proprieties.OnlineMode {
 		resp, err = mojangCheck(string(playerName), usernameCode)
 		if err != nil {
 			if err == ErrInvalidSession {
-				// Need to kick msg
+				var a packets.LoginDisconnectPacket
+				a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.DISCONNECT_LOGINFAILEDINFO_INVALID_SESSION)))
+
+				if err := sess.WritePacket(&a); err != nil {
+					sess.Server.LogError("%v", err)
+				}
 				return ErrNoReason
 			} else {
 				sess.Server.LogDebug("what happned here?")
