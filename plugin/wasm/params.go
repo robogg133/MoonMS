@@ -1,6 +1,11 @@
 package wasm
 
 func marshalParams(alloc WasmAlloc, params ...any) []uint64 {
+
+	if len(params) == 0 {
+		return []uint64{}
+	}
+
 	result := make([]uint64, 0, len(params))
 
 	for _, v := range params {
