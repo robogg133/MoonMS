@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/robogg133/MoonMS/internal/shared"
+	"github.com/robogg133/MoonMS/plugin/wasm"
 )
 
 type State uint8
@@ -48,7 +49,7 @@ const (
 	StateCrashed
 )
 
-func NewPlugin(path string) Plugin {
+func NewPlugin(path string, logWriter io.Writer) Plugin {
 	var pl Plugin
 
 	reader, err := zip.OpenReader(path)
@@ -64,9 +65,18 @@ func NewPlugin(path string) Plugin {
 
 	pl.MyFolder = filepath.Join(pluginsFolder, pl.Meta.Name)
 
+	pl.ID = pl.Meta.Identifier
+
+	if _, err = os.Stat(pl.MyFolder); err == nil {
+		pl.initRuntime(logWriter)
+		return pl
+	}
 	pl.mkdirPluginFolderStructure()
 
 	for _, v := range reader.File {
+		if v.Name == pl.Meta.Entry.File {
+			pl.copyWithPrefix(v, ".objects")
+		}
 		if slices.Contains(pl.Meta.Objects, v.Name) {
 			pl.copyWithPrefix(v, ".objects")
 		}
@@ -75,6 +85,8 @@ func NewPlugin(path string) Plugin {
 			pl.copyWithPrefix(v, ".data")
 		}
 	}
+
+	pl.initRuntime(logWriter)
 
 	return pl
 }
@@ -117,4 +129,14 @@ func (pl *Plugin) copyWithPrefix(v *zip.File, prefix string) {
 		panic(err)
 	}
 
+}
+
+func (pl *Plugin) initRuntime(logWriter io.Writer) {
+	if pl.Meta.Entry.Type == "wasm" {
+		b, err := os.ReadFile(filepath.Join(pl.MyFolder, ".objects", pl.Meta.Entry.File))
+		if err != nil {
+			panic(err)
+		}
+		pl.Runtime = wasm.NewRuntime(logWriter, b, os.DirFS(pl.MyFolder))
+	}
 }
