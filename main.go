@@ -54,7 +54,9 @@ func main() {
 		signal.Notify(sig, os.Interrupt)
 		<-sig
 
-		server.Stop()
+		err := server.Stop()
+
+		server.LogError("%v", err)
 
 		os.Exit(0)
 	}()
