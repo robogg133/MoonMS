@@ -1,6 +1,6 @@
 package plugin
 
-var pluginsFolder string = "plugins"
+var pluginsFolder string
 
 func SetPluginsFolder(folder string) {
 	pluginsFolder = folder
@@ -13,6 +13,7 @@ func (p *Plugin) Load() {
 		p.State = StateCrashed
 		panic(err)
 	}
+
 	p.State = StateLoaded
 
 }

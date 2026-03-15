@@ -21,7 +21,7 @@ type Manifest struct {
 	Description string `yaml:"description"`
 	Authors     string `yaml:"authors"`
 
-	ApiVersion string `yaml:"api-version"`
+	MCVersion string `yaml:"mc-version"`
 
 	Entry struct {
 		Type string `yaml:"type"`
