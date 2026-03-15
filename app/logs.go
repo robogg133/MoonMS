@@ -9,40 +9,60 @@ import (
 	"time"
 )
 
-func (s *Server) LogInfo(args ...any) {
+type PluginWriter struct {
+	plName string
+	s      *Server
+}
+
+func (s *Server) NewPluginWriter(plName string) *PluginWriter {
+	return &PluginWriter{
+		plName: plName,
+		s:      s,
+	}
+}
+
+func (pl *PluginWriter) SetName(s string) {
+	pl.plName = s
+}
+func (pl *PluginWriter) Write(b []byte) (int, error) {
+	pl.s.LogPlugin(pl.plName, string(b))
+	return 0, nil
+}
+
+func (s *Server) LogInfo(format string, args ...any) {
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
+	message := fmt.Sprintf(format, args...)
 	fmt.Printf("[%s] \033[34m[INFO]:\033[0m %v\n", timestamp, message)
 	fmt.Fprintf(s.logFile, "[%s] [INFO]: %v\n", timestamp, message)
 }
 
-func (s *Server) LogDebug(args ...any) {
+func (s *Server) LogDebug(format string, args ...any) {
 	if !s.Config.DebugEnabled {
 		return
 	}
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
+	message := fmt.Sprintf(format, args...)
 	fmt.Printf("[%s] \033[33m[DEBUG]:\033[0m %v\n", timestamp, message)
 	fmt.Fprintf(s.logFile, "[%s] [DEBUG]: %v\n", timestamp, message)
 }
 
-func (s *Server) LogWarn(args ...any) {
+func (s *Server) LogWarn(format string, args ...any) {
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
+	message := fmt.Sprintf(format, args...)
 	fmt.Printf("[%s] \033[33m[WARN]:\033[0m %v\n", timestamp, message)
 	fmt.Fprintf(s.logFile, "[%s] [WARN]: %v\n", timestamp, message)
 }
 
-func (s *Server) LogError(args ...any) {
+func (s *Server) LogError(format string, args ...any) {
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
+	message := fmt.Sprintf(format, args...)
 	fmt.Printf("[%s] \033[31m[ERROR]:\033[0m %v\n", timestamp, message)
 	fmt.Fprintf(s.logFile, "[%s] [ERROR]: %v\n", timestamp, message)
 }
 
-func (s *Server) LogPanic(args ...any) {
+func (s *Server) LogPanic(format string, args ...any) {
 	timestamp := time.Now().Format("2006/01/02 15:04:05")
-	message := fmt.Sprintf("%v", args...)
+	message := fmt.Sprintf(format, args...)
 	fmt.Printf("[%s] \033[31m[PANIC]:\033[0m %v\n", timestamp, message)
 	fmt.Fprintf(s.logFile, "[%s] [PANIC]: %v\n", timestamp, message)
 }
