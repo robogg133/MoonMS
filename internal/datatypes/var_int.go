@@ -9,8 +9,7 @@ type VarInt []byte
 
 func NewVarInt(value int32) VarInt { return VarInt(marshal(value)) }
 
-func ParseVarInt(r io.ByteReader) (int32, int, error) {
-	var value int32 = 0
+func ParseVarInt(r io.ByteReader) (value int32, read int, err error) {
 	var position int = 0
 	bytesRead := 0
 
