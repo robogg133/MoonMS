@@ -1,5 +1,7 @@
 package packets
 
+import "encoding/json"
+
 const PACKET_LOGIN_SUCCESS int32 = 0x02
 
 type GameProfile struct {
@@ -60,3 +62,31 @@ func (l *LoginAcknowledgedPacket) ID() int32 { return PACKET_LOGIN_ACKNOWLEDGED 
 func (l *LoginAcknowledgedPacket) Encode(w *Writer) error { return nil }
 
 func (l *LoginAcknowledgedPacket) Decode(r *Reader) error { return nil }
+
+const PACKET_LOGIN_DISCONNECT int32 = 0x00
+
+type LoginDisconnectPacket struct {
+	Reason json.RawMessage
+}
+
+func (l *LoginDisconnectPacket) ID() int32 { return PACKET_LOGIN_DISCONNECT }
+
+func (l *LoginDisconnectPacket) Encode(w *Writer) error {
+
+	b, err := l.Reason.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	return w.WritePrefixed(b)
+}
+
+func (l *LoginDisconnectPacket) Decode(r *Reader) error {
+
+	b, err := r.ReadPrefixed()
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(b, &l.Reason)
+}
