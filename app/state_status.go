@@ -19,12 +19,12 @@ func (s *StatusState) Handle(sess *Session) error {
 
 	statuspkg, err := packets.ReadPackageFromConnecion(sess.Conn)
 	if err != nil {
-		sess.Server.LogDebug("error reading ", err)
+		sess.Server.LogDebug("error reading %v ", err)
 		return ErrNoReason
 	}
 
 	if int32(statuspkg[1]) != packets.PACKET_HANDSHAKE {
-		sess.Server.LogDebug("got pkg id: ", int32(statuspkg[1]))
+		sess.Server.LogDebug("got pkg id: %d ", int32(statuspkg[1]))
 		return err
 	}
 	statuspkg = nil
@@ -43,7 +43,7 @@ func (s *StatusState) Handle(sess *Session) error {
 	} else {
 		status.Favicon, err = getBase64Image(sess.Server.MinecraftConfig.Proprieties.ServerIcon)
 		if err != nil {
-			sess.Server.LogError(err)
+			sess.Server.LogError("%v", err)
 			status.Favicon = ""
 		} else {
 			status.Favicon = fmt.Sprintf("data:image/png;base64,%s", status.Favicon)

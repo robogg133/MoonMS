@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/robogg133/MoonMS/internal/packets"
 )
 
@@ -22,10 +20,10 @@ func (s *HandshakeState) Handle(sess *Session) error {
 	if err != nil {
 		return err
 	}
-	sess.Server.LogDebug(fmt.Sprintf("current state = %s, reading packet", s.Name()))
+	sess.Server.LogDebug("current state = %s, reading packet", s.Name())
 
 	if pkg.ID() != packets.PACKET_HANDSHAKE {
-		sess.Server.LogDebug("pkg id sent: ", pkg.ID())
+		sess.Server.LogDebug("pkg id sent: %d", pkg.ID())
 		return err
 	}
 
