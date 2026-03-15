@@ -3,7 +3,7 @@ package moonms
 var heap [128 * 1024]byte
 var heapOffset uint32
 
-//export alloc
+//go:wasmexport alloc
 func alloc(size uint32) uint32 {
 	ptr := heapOffset
 	heapOffset += size
@@ -15,7 +15,7 @@ func alloc(size uint32) uint32 {
 	return ptr
 }
 
-//export abi_reset
-func abiReset() {
+//go:wasmexport abi_reset
+func abi_reset() {
 	heapOffset = 0
 }
