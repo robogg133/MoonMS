@@ -2,11 +2,13 @@ package app
 
 import (
 	"encoding/hex"
-	"fmt"
 
 	"github.com/robogg133/MoonMS/internal/packets"
 )
 
+const (
+	MINECRAFT_BRAND_IDENTIFIER = "minecraft:brand"
+)
 const STATE_NAME_CONFIG = "config"
 
 type ConfigState struct{}
@@ -36,12 +38,23 @@ func (s *ConfigState) Handle(sess *Session) error {
 
 		sess.PlayerInformation = cliInfo
 
-		sess.Server.LogDebug(sess.PlayerInformation)
+		sess.Server.LogDebug("received client information")
 
 	case packets.PACKET_PLUGIN_MESSAGE:
-		aff := p.(*packets.PluginMessagePacket)
-		sess.Server.LogDebug(fmt.Sprintf("first server_bound_plugin_message, identifier: %s", aff.Identifier))
-		sess.Server.LogDebug(fmt.Sprintf("first server_bound_plugin_message, data: %s ", hex.Dump(aff.Data)))
+		plmsg := p.(*packets.PluginMessagePacket)
+
+		if plmsg.Identifier == MINECRAFT_BRAND_IDENTIFIER {
+			r := packets.NewReader(plmsg.Data)
+
+			sess.Brand, err = r.ReadString()
+			if err != nil {
+				return err
+			}
+		}
+
+		sess.Server.LogDebug("session brand = %s", sess.Brand)
+		sess.Server.LogDebug("server_bound_plugin_message, identifier: %s", plmsg.Identifier)
+		sess.Server.LogDebug("server_bound_plugin_message, data: %s ", hex.Dump(plmsg.Data))
 	}
 
 	/*

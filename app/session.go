@@ -14,6 +14,8 @@ type Session struct {
 	PkgReader *packets.Reader
 	KnownPkgs packets.KnownPackets
 
+	Brand string
+
 	ClientProtocolVersion int32
 
 	Threshold     int32
