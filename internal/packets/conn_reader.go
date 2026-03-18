@@ -3,6 +3,7 @@ package packets
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/robogg133/MoonMS/internal/datatypes"
@@ -11,7 +12,8 @@ import (
 func ReadPackageFromConnecion(conn net.Conn) ([]byte, error) {
 
 	startBuffer := make([]byte, 5)
-	readedFromConn, err := conn.Read(startBuffer)
+
+	readedFromConn, err := io.ReadFull(conn, startBuffer)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +31,7 @@ func ReadPackageFromConnecion(conn net.Conn) ([]byte, error) {
 	response := make([]byte, 5+needToReadAmmount)
 	copy(response, startBuffer)
 
-	n, err := conn.Read(response[5:])
+	n, err := io.ReadFull(conn, response[5:])
 	if err != nil {
 		return nil, err
 	}

@@ -24,6 +24,8 @@ type Server struct {
 
 	PlayerList []packets.PlayerListInfo
 
+	Sessions map[string]*Session
+
 	ServerPrivateKey *rsa.PrivateKey
 
 	op struct {
@@ -152,13 +154,22 @@ func (s *Server) IsBanned(plr string) bool {
 }
 
 // IsOperator checks if the player uuid is operator in the server
-func (s *Server) IsOperator(plr string) bool {
+func (s *Server) IsOperator(uuid string) bool {
 
 	s.op.lock.RLock()
-	_, found := s.op.check[plr]
+	_, found := s.op.check[uuid]
 	s.op.lock.RUnlock()
 
 	return found
+}
+
+func (s *Server) GetOpEntry(uuid string) *OPEntry {
+
+	s.op.lock.RLock()
+	entry := s.op.check[uuid]
+	s.op.lock.RUnlock()
+
+	return entry
 }
 
 func (s *Server) handleConn(conn net.Conn) {
@@ -174,5 +185,6 @@ func (s *Server) handleConn(conn net.Conn) {
 
 	if err := sess.Run(); err != nil {
 		s.LogError("%v", err)
+		sess.Close()
 	}
 }

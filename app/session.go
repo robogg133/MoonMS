@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 
+	"github.com/google/uuid"
 	"github.com/robogg133/MoonMS/internal/packets"
 )
 
@@ -23,6 +24,9 @@ type Session struct {
 	DecryptCipher cipher.Stream
 
 	stop bool
+
+	UUID     uuid.UUID
+	Username string
 
 	PlayerInformation *packets.ClientInformationPacket
 
@@ -49,6 +53,11 @@ func (s *Session) Run() error {
 			}
 		}
 	}
+}
+
+func (s *Session) Close() error {
+	return s.Conn.Close()
+
 }
 
 // Returns new session object, only knowing handshake package, and with handshake state
