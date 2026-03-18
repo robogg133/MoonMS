@@ -110,41 +110,11 @@ func (s *LoginState) Handle(sess *Session) error {
 		sess.Threshold = sess.Server.MinecraftConfig.Advanced.Threshold
 	}
 
-	if sess.Server.IsBanned(playerUUID.String()) {
-		// If is banned
-		sess.Server.LogDebug("%s is banned (%s)", string(playerName), playerUUID.String())
-		var a packets.LoginDisconnectPacket
-		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_BANNED)))
+	sess.Username = string(playerName)
+	sess.UUID = playerUUID
 
-		if err := sess.WritePacket(&a); err != nil {
-			sess.Server.LogError("%v", err)
-		}
-
-		return ErrNoReason
-	} else if sess.Server.IsBanned(strings.Split(sess.Conn.RemoteAddr().String(), ":")[1]) {
-		// If is ip banned
-		sess.Server.LogDebug("%s is ip banned (%s) IP: %s ", string(playerName), playerUUID.String(), strings.Split(sess.Conn.RemoteAddr().String(), ":")[1])
-
-		var a packets.LoginDisconnectPacket
-		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_IP_BANNED)))
-
-		if err := sess.WritePacket(&a); err != nil {
-			sess.Server.LogError("%v", err)
-		}
-
-		return ErrNoReason
-	} else if sess.Server.MinecraftConfig.Proprieties.Whitelist {
-		if !sess.Server.IsWhitelisted(playerUUID.String()) {
-			// if not whitelisted
-
-			var a packets.LoginDisconnectPacket
-			a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_NOT_WHITELISTED)))
-
-			if err := sess.WritePacket(&a); err != nil {
-				sess.Server.LogError("%v", err)
-			}
-			return ErrNoReason
-		}
+	if err := sess.CanJoin(); err != nil {
+		return err
 	}
 
 	var resp MojangAnswer
@@ -223,6 +193,83 @@ func (s *LoginState) Handle(sess *Session) error {
 	sess.State = &ConfigState{}
 
 	return err
+}
+
+func (sess *Session) CanJoin() error {
+
+	if sess.Server.IsBanned(sess.UUID.String()) {
+		// If is banned
+		sess.Server.LogDebug("%s is banned (%s)", sess.Username, sess.UUID.String())
+		var a packets.LoginDisconnectPacket
+		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_BANNED)))
+
+		if err := sess.WritePacket(&a); err != nil {
+			sess.Server.LogError("%v", err)
+		}
+
+		return ErrNoReason
+	} else if sess.Server.IsBanned(strings.Split(sess.Conn.RemoteAddr().String(), ":")[1]) {
+		// If is ip banned
+		sess.Server.LogDebug("%s is ip banned (%s) IP: %s ", sess.Username, sess.UUID.String(), strings.Split(sess.Conn.RemoteAddr().String(), ":")[1])
+
+		var a packets.LoginDisconnectPacket
+		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_IP_BANNED)))
+
+		if err := sess.WritePacket(&a); err != nil {
+			sess.Server.LogError("%v", err)
+		}
+
+		return ErrNoReason
+	}
+	if sess.Server.MinecraftConfig.Proprieties.Whitelist {
+		if !sess.Server.IsWhitelisted(sess.UUID.String()) {
+			// if not whitelisted
+
+			var a packets.LoginDisconnectPacket
+			a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_NOT_WHITELISTED)))
+
+			if err := sess.WritePacket(&a); err != nil {
+				sess.Server.LogError("%v", err)
+			}
+			return ErrNoReason
+		}
+	}
+	if sess.Server.OnlinePlayers >= uint32(sess.Server.MinecraftConfig.Proprieties.MaxPlayer) {
+		if sess.Server.IsOperator(sess.UUID.String()) {
+			entry := sess.Server.GetOpEntry(sess.UUID.String())
+
+			if entry.BypassPlayerLimit {
+				return nil
+			}
+		}
+
+		var a packets.LoginDisconnectPacket
+		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_SERVER_FULL)))
+
+		if err := sess.WritePacket(&a); err != nil {
+			sess.Server.LogError("%v", err)
+		}
+
+		return ErrNoReason
+	}
+
+	if _, exists := sess.Server.Sessions[sess.UUID.String()]; exists {
+		if exists {
+			var a packets.LoginDisconnectPacket
+			if sess.Server.MinecraftConfig.Proprieties.OnlineMode {
+				a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_DUPLICATE_LOGIN)))
+			} else {
+				a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_NAME_TAKEN)))
+			}
+
+			if err := sess.WritePacket(&a); err != nil {
+				sess.Server.LogError("%v", err)
+			}
+			return ErrNoReason
+		}
+	}
+
+	return nil
 }
 
 func setupEncryption(sess *Session) (encKey, decKey *CFB8.CFB8, usernameHex string, err error) {

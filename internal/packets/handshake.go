@@ -64,7 +64,7 @@ type StatusPacket struct {
 	} `json:"version"`
 
 	Players struct {
-		MaxPlayers    uint             `json:"max"`
+		MaxPlayers    uint32           `json:"max"`
 		OnlinePlayers uint32           `json:"online"`
 		PlayerStatus  []PlayerListInfo `json:"sample"`
 	} `json:"players"`
@@ -91,7 +91,12 @@ func (h *StatusPacket) Encode(w *Writer) error {
 
 func (h *StatusPacket) Decode(r *Reader) error {
 
-	jsonDecoder := json.NewDecoder(r)
+	s, err := r.ReadPrefixed()
+	if err != nil {
+		return err
+	}
 
-	return jsonDecoder.Decode(h)
+	err = json.Unmarshal(s, h)
+
+	return err
 }

@@ -23,6 +23,8 @@ func (s *StatusState) Handle(sess *Session) error {
 		return ErrNoReason
 	}
 
+	sess.Server.LogDebug("pkg = %v", statuspkg)
+
 	if int32(statuspkg[1]) != packets.PACKET_STATUS {
 		sess.Server.LogDebug("got pkg id: %d ", int32(statuspkg[1]))
 		return err
@@ -60,12 +62,12 @@ func (s *StatusState) Handle(sess *Session) error {
 	ping, err := sess.ReadPacket()
 	if err != nil {
 		sess.Server.LogDebug("error reading ping")
-		return nil
+		return ErrNoReason
 	}
 
 	if ping.ID() == packets.PACKET_PING_PONG {
 		if err := sess.WritePacket(ping); err != nil {
-			return err
+			return ErrNoReason
 		}
 	}
 

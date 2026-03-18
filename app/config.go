@@ -37,7 +37,7 @@ type MinecraftServerConfig struct {
 		Seed          int64  `toml:"level-seed"`
 		Hardcore      bool   `toml:"hardcore"`
 
-		MaxPlayer uint `toml:"max-players"`
+		MaxPlayer uint32 `toml:"max-players"`
 
 		OnlineMode bool `toml:"online-mode"`
 
@@ -114,7 +114,7 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			LevelName          string  "toml:\"level-name\" "
 			Seed               int64   "toml:\"level-seed\""
 			Hardcore           bool    "toml:\"hardcore\""
-			MaxPlayer          uint    "toml:\"max-players\""
+			MaxPlayer          uint32  "toml:\"max-players\""
 			OnlineMode         bool    "toml:\"online-mode\""
 			AllowServerList    bool    "toml:\"allow-server-list\""
 			ServerIcon         string  "toml:\"sever-icon-path\""
