@@ -55,8 +55,8 @@ func (s *Session) Run() error {
 func NewSession(conn net.Conn, server *Server) *Session {
 
 	kpkg := make(packets.KnownPackets)
-	kpkg.RegisterPacket(packets.PACKET_HANDSHAKE, func() packets.Packet {
-		return &packets.Handshake{}
+	kpkg.RegisterPacket(packets.PACKET_HELLO, func() packets.Packet {
+		return &packets.HelloPacket{}
 	})
 
 	return &Session{

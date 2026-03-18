@@ -4,22 +4,32 @@ import (
 	"encoding/json"
 )
 
-const PACKET_HANDSHAKE int32 = 0x00
+const PACKET_HELLO int32 = 0x00
+const PACKET_STATUS int32 = 0x00
 
-type Handshake struct {
+type HelloPacket struct {
 	ProtocolVersion int32
 	ServerAdress    string
 	ServerPort      uint16
 	Intent          int32
 }
 
-func (h *Handshake) ID() int32 { return PACKET_HANDSHAKE }
+func (h *HelloPacket) ID() int32 { return PACKET_HELLO }
 
-func (h *Handshake) Encode(w *Writer) error {
+func (h *HelloPacket) Encode(w *Writer) error {
+
+	w.WriteVarInt(h.ProtocolVersion)
+
+	w.WriteString(h.ServerAdress)
+
+	w.WriteUnsignedShort(h.ServerPort)
+
+	w.WriteVarInt(h.Intent)
+
 	return nil
 }
 
-func (h *Handshake) Decode(r *Reader) error {
+func (h *HelloPacket) Decode(r *Reader) error {
 
 	n, err := r.ReadVarInt()
 	if err != nil {
@@ -47,7 +57,7 @@ type PlayerListInfo struct {
 	UUID     string `json:"id"`
 }
 
-type HandShakeResponseStatus struct {
+type StatusPacket struct {
 	Version struct {
 		Name            string `json:"name"`
 		ProtocolVersion int32  `json:"protocol"`
@@ -67,9 +77,9 @@ type HandShakeResponseStatus struct {
 	EnforceSecureChat bool   `json:"enforcesSecureChat"`
 }
 
-func (h *HandShakeResponseStatus) ID() int32 { return PACKET_HANDSHAKE }
+func (h *StatusPacket) ID() int32 { return PACKET_STATUS }
 
-func (h *HandShakeResponseStatus) Encode(w *Writer) error {
+func (h *StatusPacket) Encode(w *Writer) error {
 
 	statusSerialized, err := json.Marshal(&h)
 	if err != nil {
@@ -79,7 +89,7 @@ func (h *HandShakeResponseStatus) Encode(w *Writer) error {
 	return w.WritePrefixed(statusSerialized)
 }
 
-func (h *HandShakeResponseStatus) Decode(r *Reader) error {
+func (h *StatusPacket) Decode(r *Reader) error {
 
 	jsonDecoder := json.NewDecoder(r)
 

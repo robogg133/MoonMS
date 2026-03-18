@@ -68,7 +68,7 @@ func (s *LoginState) Handle(sess *Session) error {
 	offset += tmp
 	tmp = 0
 
-	if protocolID != packets.PACKET_HANDSHAKE {
+	if protocolID != packets.PACKET_HELLO {
 		return err
 	}
 

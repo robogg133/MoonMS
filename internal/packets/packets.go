@@ -22,10 +22,6 @@ type Packet interface {
 	Decode(r *Reader) error
 }
 
-type connStatus struct {
-	Threshold int
-}
-
 type KnownPackets map[int32]func() Packet
 
 func (kpkg KnownPackets) RegisterPacket(id int32, fn func() Packet) {

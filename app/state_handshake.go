@@ -22,14 +22,14 @@ func (s *HandshakeState) Handle(sess *Session) error {
 	}
 	sess.Server.LogDebug("current state = %s, reading packet", s.Name())
 
-	if pkg.ID() != packets.PACKET_HANDSHAKE {
+	if pkg.ID() != packets.PACKET_HELLO {
 		sess.Server.LogDebug("pkg id sent: %d", pkg.ID())
 		return err
 	}
 
-	sess.ClientProtocolVersion = pkg.(*packets.Handshake).ProtocolVersion
+	sess.ClientProtocolVersion = pkg.(*packets.HelloPacket).ProtocolVersion
 
-	switch pkg.(*packets.Handshake).Intent {
+	switch pkg.(*packets.HelloPacket).Intent {
 	case INTENT_STATUS:
 		sess.State = &StatusState{}
 	case INTENT_LOGIN:

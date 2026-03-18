@@ -23,13 +23,13 @@ func (s *StatusState) Handle(sess *Session) error {
 		return ErrNoReason
 	}
 
-	if int32(statuspkg[1]) != packets.PACKET_HANDSHAKE {
+	if int32(statuspkg[1]) != packets.PACKET_STATUS {
 		sess.Server.LogDebug("got pkg id: %d ", int32(statuspkg[1]))
 		return err
 	}
 	statuspkg = nil
 
-	var status packets.HandShakeResponseStatus
+	var status packets.StatusPacket
 
 	status.Version.Name = sess.Server.MinecraftConfig.MinecraftVersion
 	status.Version.ProtocolVersion = sess.Server.MinecraftConfig.ProtcolVersion
