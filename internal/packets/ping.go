@@ -3,14 +3,14 @@ package packets
 const PACKET_PING_PONG int32 = 0x01
 
 type PingPong struct {
-	Bytes []byte
+	Bytes [8]byte
 }
 
 func (p *PingPong) ID() int32 { return PACKET_PING_PONG }
 
 func (p *PingPong) Encode(w *Writer) error {
 
-	if err := w.Write(p.Bytes); err != nil {
+	if err := w.Write(p.Bytes[:]); err != nil {
 		return err
 	}
 
@@ -24,7 +24,6 @@ func (p *PingPong) Decode(r *Reader) error {
 		return err
 	}
 
-	p.Bytes = buff
-
+	p.Bytes = [8]byte(buff)
 	return nil
 }
