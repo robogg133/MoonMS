@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -81,14 +82,39 @@ func main() {
 	}
 
 	os.Chdir(startingDir)
-	switch flag.Arg(0) {
-	case "biome":
-		doBiome(startingDir, filepath.Join(folder, "worldgen", "biome"), releaseName)
-	case "damage_type":
-		doDamageTypes(startingDir, filepath.Join(folder, "damage_type"), releaseName)
-	default:
-		doBiome(startingDir, filepath.Join(folder, "worldgen", "biome"), releaseName)
-		doDamageTypes(startingDir, filepath.Join(folder, "damage_type"), releaseName)
+
+	scriptsFolder := "./tools/autogen/minecraft-core/scripts/"
+
+	if err := exec.Command("go", "generate", scriptsFolder+"...").Run(); err != nil {
+		panic(err)
 	}
 
+	switch flag.Arg(0) {
+	case "biome":
+		execFile(filepath.Join(scriptsFolder, "biome"), []string{filepath.Join(startingDir, "internal", "gen", "core", "worldgen"), filepath.Join(folder, "worldgen", "biome"), releaseName})
+	case "damage_type":
+		execFile(filepath.Join(scriptsFolder, "damage"), []string{filepath.Join(startingDir, "internal", "gen", "core", "damage"), filepath.Join(folder, "damage_type"), releaseName})
+	default:
+		execFile(filepath.Join(scriptsFolder, "biome"), []string{filepath.Join(startingDir, "internal", "gen", "core", "worldgen"), filepath.Join(folder, "worldgen", "biome"), releaseName})
+		execFile(filepath.Join(scriptsFolder, "damage"), []string{filepath.Join(startingDir, "internal", "gen", "core", "damage"), filepath.Join(folder, "damage_type"), releaseName})
+	}
+
+	fmt.Println("end")
+}
+
+func execFile(s string, args []string) {
+
+	fmt.Printf("Running %s\n", s)
+
+	execPath := filepath.Join(s, "exec")
+
+	cmd := exec.Command(execPath, args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+
+	err := cmd.Run()
+
+	if err != nil {
+		panic(err)
+	}
 }

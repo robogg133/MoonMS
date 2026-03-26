@@ -1,3 +1,4 @@
+//go:generate go build -o exec .
 package main
 
 import (
@@ -7,21 +8,25 @@ import (
 	"path/filepath"
 	"strings"
 
-	damagetype "github.com/robogg133/MoonMS/tools/autogen/minecraft-core/parse/damage_type"
+	damagetype "github.com/robogg133/MoonMS/tools/autogen/minecraft-core/scripts/damage/damage_type"
 )
 
-func doDamageTypes(startingDir, damageFolder, releaseName string) {
+func main() {
+
+	startingDir := os.Args[1]
+	damageFolder := os.Args[2]
+	releaseName := os.Args[3]
+
+	os.MkdirAll(startingDir, 0777)
+
 	dir, err := os.ReadDir(damageFolder)
 	if err != nil {
 		panic(err)
 	}
 
 	os.Chdir(startingDir)
-	if err := os.MkdirAll("internal/gen/core/damage/", 0777); err != nil {
-		panic(err)
-	}
 	f, err := os.OpenFile(
-		"internal/gen/core/damage/types.go",
+		"types.go",
 		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
 		0777,
 	)
