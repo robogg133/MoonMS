@@ -52,7 +52,7 @@ func (w *DamageTypeFileWriter) WriteObject(name string, d DamageType) {
 		fmt.Fprintf(w.w, "\tDeathMessageType: \"%s\",\n", d.DeathMessageType)
 	}
 
-	fmt.Fprintln(w.w, "}\n")
+	fmt.Fprint(w.w, "}\n\n")
 
 	w.knownTypes = append(w.knownTypes, name)
 }

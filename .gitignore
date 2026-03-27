@@ -12,3 +12,4 @@ access/
 !plugin-example.yml
 *.lock
 dist/
+exec

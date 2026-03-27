@@ -1,3 +1,4 @@
+//go:generate go build -o exec .
 package main
 
 import (
@@ -8,21 +9,25 @@ import (
 	"strings"
 
 	"github.com/robogg133/MoonMS/data"
-	parser "github.com/robogg133/MoonMS/tools/autogen/minecraft-core/parse"
-	"github.com/robogg133/MoonMS/tools/autogen/minecraft-core/parse/worldgen"
+	parser "github.com/robogg133/MoonMS/tools/autogen/minecraft-core/helper"
+	"github.com/robogg133/MoonMS/tools/autogen/minecraft-core/scripts/biome/worldgen"
 )
 
-func doBiome(startingDir, biomeFolder, releaseName string) {
+func main() {
+
+	startingDir := os.Args[1]
+	biomeFolder := os.Args[2]
+	releaseName := os.Args[3]
+
+	os.MkdirAll(startingDir, 0777)
+
 	dir, err := os.ReadDir(biomeFolder)
 	if err != nil {
 		panic(err)
 	}
 
 	os.Chdir(startingDir)
-	if err := os.MkdirAll("internal/gen/core/damage/", 0777); err != nil {
-		panic(err)
-	}
-	f, err := os.OpenFile("internal/gen/core/worldgen/biomes.go", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0777)
+	f, err := os.OpenFile("biomes.go", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0777)
 	if err != nil {
 		panic(err)
 	}
