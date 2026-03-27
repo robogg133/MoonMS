@@ -106,6 +106,12 @@ func (s *Server) basicFiles() error {
 
 	s.LogDebug("created whitelist file")
 
+	if err := os.MkdirAll("plugins", 0777); err != nil {
+		return err 
+	}
+
+	s.LogDebug("created plugins folder")
+
 	return nil
 }
 

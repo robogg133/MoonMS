@@ -55,9 +55,9 @@ func main() {
 		<-sig
 
 		err := server.Stop()
-
-		server.LogError("%v", err)
-
+		if err != nil {
+			server.LogError("%v", err)
+		}
 		os.Exit(0)
 	}()
 

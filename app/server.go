@@ -117,8 +117,9 @@ func (s *Server) Start() {
 }
 
 func (s *Server) Stop() error {
-	s.LogDebug("received stop signal ")
+	s.LogInfo("Received stop signal, stopping the server")
 
+	
 	for id, plg := range s.Plugins {
 
 		if plg.State != plugin.StateEnabled && plg.State != plugin.StateLoaded {
