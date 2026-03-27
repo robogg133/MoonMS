@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	BANNED_ACCOUNTS_PATH = "access/banned-players.json"
-	OPS_PATH             = "access/ops.json"
-	WHITELIST_PATH       = "access/whitelist.json"
+	BANNED_ACCOUNTS_PATH = "banned-players.json"
+	OPS_PATH             = "ops.json"
+	WHITELIST_PATH       = "whitelist.json"
 )
 
 type WhitelistEntry struct {
@@ -37,19 +37,19 @@ type OPEntry struct {
 func (s *Server) loadFiles() error {
 
 	s.Bans.lock.Lock()
-	if err := readFile(BANNED_ACCOUNTS_PATH, &s.Bans.list); err != nil {
+	if err := readFile(filepath.Join(s.Config.AcessFolder, BANNED_ACCOUNTS_PATH), &s.Bans.list); err != nil {
 		return err
 	}
 	s.Bans.lock.Unlock()
 
 	s.OPs.lock.Lock()
-	if err := readFile(OPS_PATH, &s.OPs.list); err != nil {
+	if err := readFile(filepath.Join(s.Config.AcessFolder, OPS_PATH), &s.OPs.list); err != nil {
 		return err
 	}
 	s.OPs.lock.Unlock()
 
 	s.Whitelisteds.lock.Lock()
-	if err := readFile(OPS_PATH, &s.Whitelisteds.list); err != nil {
+	if err := readFile(filepath.Join(s.Config.AcessFolder, WHITELIST_PATH), &s.Whitelisteds.list); err != nil {
 		return err
 	}
 	s.Whitelisteds.lock.Unlock()
@@ -89,25 +89,25 @@ func (s *Server) loadFiles() error {
 
 func (s *Server) basicFiles() error {
 
-	if err := createFile(BANNED_ACCOUNTS_PATH); err != nil {
+	if err := createFile(filepath.Join(s.Config.AcessFolder, BANNED_ACCOUNTS_PATH)); err != nil {
 		return err
 	}
 
 	s.LogDebug("created banned-players file")
 
-	if err := createFile(OPS_PATH); err != nil {
+	if err := createFile(filepath.Join(s.Config.AcessFolder, OPS_PATH)); err != nil {
 		return err
 	}
 	s.LogDebug("created ops file")
 
-	if err := createFile(WHITELIST_PATH); err != nil {
+	if err := createFile(filepath.Join(s.Config.AcessFolder, WHITELIST_PATH)); err != nil {
 		return err
 	}
 
 	s.LogDebug("created whitelist file")
 
-	if err := os.MkdirAll("plugins", 0777); err != nil {
-		return err 
+	if err := os.MkdirAll(s.Config.PluginsFolder, 0777); err != nil {
+		return err
 	}
 
 	s.LogDebug("created plugins folder")

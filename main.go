@@ -33,6 +33,7 @@ func main() {
 		StartName:     "java",
 		DebugEnabled:  false,
 		PluginsFolder: "plugins",
+		AcessFolder:   "access",
 	}
 
 	if os.Getenv("DEBUG") == "true" {
