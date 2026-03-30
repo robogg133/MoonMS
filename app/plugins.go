@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/robogg133/MoonMS/plugin"
+	"github.com/robogg133/MoonMS/pkg/plugin"
 )
 
 var ErrSameIdentifier = errors.New("plugins with the same identifier, please check your plugins")

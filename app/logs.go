@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -25,7 +26,8 @@ func (pl *PluginWriter) SetName(s string) {
 	pl.plName = s
 }
 func (pl *PluginWriter) Write(b []byte) (int, error) {
-	pl.s.LogPlugin(pl.plName, string(b))
+
+	pl.s.LogPlugin(pl.plName, strings.TrimSuffix(string(b), "\n"))
 	return 0, nil
 }
 

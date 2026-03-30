@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/robogg133/MoonMS/internal/packets"
-	"github.com/robogg133/MoonMS/plugin"
+	"github.com/robogg133/MoonMS/pkg/plugin"
 )
 
 type Server struct {

@@ -24,7 +24,7 @@ const (
 	DIFFICULTY_HARD   = "hard"
 )
 
-const DEFAULT_MOTD string = "A Moon Minecraft Server!"
+const DEFAULT_MOTD string = "A Minecraft server"
 
 type MinecraftServerConfig struct {
 	Proprieties struct {
@@ -50,10 +50,6 @@ type MinecraftServerConfig struct {
 		ViewDistance uint8 `toml:"view-distance"`
 
 		SimluationDistance uint8 `toml:"simulation-distance"`
-
-		AllowNether bool `toml:"allow-nether"`
-
-		AllowEnd bool `toml:"allow-end"`
 
 		TPS float32 `toml:"tps"`
 
@@ -121,8 +117,6 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			ServerPort         uint16  "toml:\"server-port\""
 			ViewDistance       uint8   "toml:\"view-distance\""
 			SimluationDistance uint8   "toml:\"simulation-distance\""
-			AllowNether        bool    "toml:\"allow-nether\""
-			AllowEnd           bool    "toml:\"allow-end\""
 			TPS                float32 "toml:\"tps\""
 			Whitelist          bool    "toml:\"whitelist\""
 		}{
@@ -139,8 +133,6 @@ func getDefaultCfgFile() MinecraftServerConfig {
 			ServerPort:         25565,
 			ViewDistance:       10,
 			SimluationDistance: 16,
-			AllowNether:        true,
-			AllowEnd:           true,
 			TPS:                20.0,
 			Whitelist:          false,
 		},
