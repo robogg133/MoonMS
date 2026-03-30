@@ -1,6 +1,7 @@
 *.txt
 *.yml
 *.plugin
+*.plg
 *.toml
 *.png
 *.key
@@ -13,3 +14,5 @@ access/
 *.lock
 dist/
 exec
+*.nbt
+plugins/
