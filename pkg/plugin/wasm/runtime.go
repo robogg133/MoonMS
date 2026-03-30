@@ -35,16 +35,19 @@ func NewRuntime(w io.Writer, file []byte, fs fs.FS) *Runtime {
 		logwriter: w,
 	}
 
+	r.ctx, r.cancel = context.WithCancel(context.Background())
+	r.state = wazero.NewRuntime(r.ctx)
+
+	r.state.NewHostModuleBuilder("env")
+
+	wasi_snapshot_preview1.MustInstantiate(r.ctx, r.state)
+
 	r.moduleCfg = wazero.NewModuleConfig().
 		WithName("plugin").
 		WithStdout(r.logwriter).
 		WithStderr(r.logwriter).
-		WithStdin(nil).
 		WithFS(fs)
 
-	r.ctx, r.cancel = context.WithCancel(context.Background())
-	r.state = wazero.NewRuntime(r.ctx)
-	wasi_snapshot_preview1.MustInstantiate(r.ctx, r.state)
 	r.file = file
 
 	return r
@@ -54,20 +57,21 @@ func (r *Runtime) Load() error {
 	deadline, cancel := context.WithDeadline(r.ctx, time.Now().Add(30*time.Second))
 	defer cancel()
 
-	cmpModule, err := r.state.CompileModule(deadline, r.file)
+	var err error
+	r.mod, err = r.state.InstantiateWithConfig(deadline, r.file, r.moduleCfg)
 	if err != nil {
 		return err
 	}
 
 	r.file = nil
-
-	r.mod, err = r.state.InstantiateModule(deadline, cmpModule, r.moduleCfg)
-	if err != nil {
-		return err
-	}
+	r.enabled = true
 
 	r.alloc = newBasicAlloc(r.mod.Memory(), r.mod.ExportedFunction("alloc"), &r.ctx)
-	r.enabled = true
+
+	for fnName := range r.mod.ExportedFunctionDefinitions() {
+		fmt.Println(fnName)
+	}
+
 	return nil
 }
 
@@ -110,7 +114,7 @@ func (r *Runtime) Call(name string, params ...any) error {
 }
 
 func (r *Runtime) Close() error {
-	r.cancel()
+	defer r.cancel()
 	err := r.state.Close(r.ctx)
 	return err
 }

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/robogg133/MoonMS/internal/shared"
-	"github.com/robogg133/MoonMS/plugin/wasm"
+	"github.com/robogg133/MoonMS/pkg/plugin/wasm"
 )
 
 type State uint8
@@ -68,6 +68,14 @@ func NewPlugin(path string, logWriter io.Writer) Plugin {
 	pl.ID = pl.Meta.Identifier
 
 	if _, err = os.Stat(pl.MyFolder); err == nil {
+		for _, v := range reader.File {
+			if v.Name == pl.Meta.Entry.File {
+				pl.copyWithPrefix(v, ".objects")
+			}
+			if slices.Contains(pl.Meta.Objects, v.Name) {
+				pl.copyWithPrefix(v, ".objects")
+			}
+		}
 		pl.initRuntime(logWriter)
 		return pl
 	}
