@@ -116,8 +116,10 @@ func (s *Server) compressLog() error {
 
 	_, err = io.Copy(writer, oldLog)
 	if err != nil {
+		writer.Close()
 		return err
 	}
 
+	writer.Close()
 	return os.Remove(s.Config.LatestLogFile)
 }
