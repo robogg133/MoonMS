@@ -120,6 +120,7 @@ func (s *Server) compressLog() error {
 		return err
 	}
 
-	writer.Close()
-	return os.Remove(s.Config.LatestLogFile)
+	defer os.Remove(s.Config.LatestLogFile)
+
+	return writer.Close()
 }
