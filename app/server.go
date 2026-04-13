@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/robogg133/MoonMS/internal/packets"
 	"github.com/robogg133/MoonMS/pkg/plugin"
 )
@@ -27,6 +28,8 @@ type Server struct {
 	Sessions map[string]*Session
 
 	ServerPrivateKey *rsa.PrivateKey
+
+	database *badger.DB
 
 	op struct {
 		lock  sync.RWMutex
@@ -78,8 +81,9 @@ type Config struct {
 
 	StartName string
 
-	AcessFolder   string
-	PluginsFolder string
+	AcessFolder    string
+	PluginsFolder  string
+	DatabaseFolder string
 }
 
 func (s *Server) Start() {
@@ -96,6 +100,19 @@ func (s *Server) Start() {
 	if err := s.loadFiles(); err != nil {
 		panic(err)
 	}
+
+	s.LogInfo("Starting database...")
+	wrapper := NewBadgerLogWrapper(s)
+
+	opt := badger.DefaultOptions(s.Config.DatabaseFolder)
+	opt.Logger = wrapper
+
+	db, err := badger.Open(opt)
+	if err != nil {
+		panic(err)
+	}
+
+	s.database = db
 
 	s.InitPlugins()
 
@@ -132,7 +149,12 @@ func (s *Server) Stop() error {
 			return err
 		}
 	}
-	return nil
+
+	s.LogInfo("Closing database...")
+
+	err := s.database.Close()
+
+	return err
 }
 
 func (s *Server) IsWhitelisted(plr string) bool {

@@ -124,3 +124,32 @@ func (s *Server) compressLog() error {
 
 	return writer.Close()
 }
+
+//
+
+type logWrapper struct {
+	server *Server
+}
+
+func NewBadgerLogWrapper(s *Server) *logWrapper {
+
+	return &logWrapper{
+		server: s,
+	}
+
+}
+func (l *logWrapper) Debugf(s string, args ...interface{}) {
+	l.server.LogDebug(s, args...)
+}
+
+func (l *logWrapper) Errorf(s string, args ...interface{}) {
+	l.server.LogError(s, args...)
+}
+
+func (l *logWrapper) Warningf(s string, args ...interface{}) {
+	l.server.LogWarn(s, args...)
+}
+
+func (l *logWrapper) Infof(s string, args ...interface{}) {
+	l.server.LogDebug(s, args...)
+}

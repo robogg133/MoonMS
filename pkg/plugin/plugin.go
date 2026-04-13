@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/robogg133/MoonMS/internal/shared"
-	"github.com/robogg133/MoonMS/pkg/plugin/wasm"
 )
 
 type State uint8
@@ -140,11 +139,5 @@ func (pl *Plugin) copyWithPrefix(v *zip.File, prefix string) {
 }
 
 func (pl *Plugin) initRuntime(logWriter io.Writer) {
-	if pl.Meta.Entry.Type == "wasm" {
-		b, err := os.ReadFile(filepath.Join(pl.MyFolder, ".objects", pl.Meta.Entry.File))
-		if err != nil {
-			panic(err)
-		}
-		pl.Runtime = wasm.NewRuntime(logWriter, b, os.DirFS(pl.MyFolder))
-	}
+
 }

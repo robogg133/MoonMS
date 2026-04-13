@@ -5,18 +5,11 @@ import (
 	"crypto/rsa"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/robogg133/MoonMS/app"
 
 	_ "embed"
 )
-
-const DEADLINE = time.Second * 30
-
-type MojangAnswer struct {
-	Properties []map[string]string
-}
 
 func main() {
 
@@ -29,11 +22,12 @@ func main() {
 	cfg.ProtcolVersion = 774
 
 	scfg := app.Config{
-		LatestLogFile: "logs/latest.log",
-		StartName:     "java",
-		DebugEnabled:  false,
-		PluginsFolder: "plugins",
-		AcessFolder:   "access",
+		LatestLogFile:  "logs/latest.log",
+		StartName:      "java",
+		DebugEnabled:   false,
+		PluginsFolder:  "plugins",
+		AcessFolder:    "data/access",
+		DatabaseFolder: "data/database",
 	}
 
 	if os.Getenv("DEBUG") == "true" {

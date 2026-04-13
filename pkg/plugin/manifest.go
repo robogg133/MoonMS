@@ -23,11 +23,6 @@ type Manifest struct {
 
 	MCVersion string `yaml:"mc-version"`
 
-	Entry struct {
-		Type string `yaml:"type"`
-		File string `yaml:"file"`
-	} `yaml:"entry"`
-
 	Objects []string `yaml:"objects"`
 
 	Require  []Dependencie `yaml:"require"`
