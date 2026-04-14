@@ -18,8 +18,8 @@ func main() {
 		panic(err)
 	}
 
-	cfg.MinecraftVersion = "1.21.11"
-	cfg.ProtcolVersion = 774
+	cfg.MinecraftVersion = "26.1.2"
+	cfg.ProtcolVersion = 775
 
 	scfg := app.Config{
 		LatestLogFile:  "logs/latest.log",
