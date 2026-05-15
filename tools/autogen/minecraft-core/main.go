@@ -94,7 +94,11 @@ func main() {
 		execFile(filepath.Join(scriptsFolder, "biome"), []string{filepath.Join(startingDir, "internal", "gen", "core", "worldgen"), filepath.Join(folder, "worldgen", "biome"), releaseName})
 	case "damage_type":
 		execFile(filepath.Join(scriptsFolder, "damage"), []string{filepath.Join(startingDir, "internal", "gen", "core", "damage"), filepath.Join(folder, "damage_type"), releaseName})
+
+	case "languague_codes":
+		execFile(filepath.Join(scriptsFolder, "translation"), []string{filepath.Join(startingDir, "internal", "shared"), filepath.Join(folder, "..", "minecraft_lang_codes"), releaseName})
 	default:
+		execFile(filepath.Join(scriptsFolder, "translation"), []string{filepath.Join(startingDir, "internal", "shared"), filepath.Join(folder, "..", "minecraft_lang_codes"), releaseName})
 		execFile(filepath.Join(scriptsFolder, "biome"), []string{filepath.Join(startingDir, "internal", "gen", "core", "worldgen"), filepath.Join(folder, "worldgen", "biome"), releaseName})
 		execFile(filepath.Join(scriptsFolder, "damage"), []string{filepath.Join(startingDir, "internal", "gen", "core", "damage"), filepath.Join(folder, "damage_type"), releaseName})
 	}

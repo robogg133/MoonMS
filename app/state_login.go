@@ -126,7 +126,7 @@ func (s *LoginState) Handle(sess *Session) error {
 		if err != nil {
 			if err == ErrInvalidSession {
 				var a packets.LoginDisconnectPacket
-				a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.DISCONNECT_LOGINFAILEDINFO_INVALID_SESSION)))
+				a.Reason = json.RawMessage([]byte(shared.TranslationMessage(shared.Disconnect_LoginFailedInfo_InvalidSession)))
 
 				if err := sess.WritePacket(&a); err != nil {
 					sess.Server.LogError("%v", err)
@@ -203,7 +203,7 @@ func (sess *Session) CanJoin() error {
 		// If is banned
 		sess.Server.LogDebug("%s is banned (%s)", sess.Username, sess.UUID.String())
 		var a packets.LoginDisconnectPacket
-		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_BANNED)))
+		a.Reason = shared.TranslationMessage(shared.Multiplayer_Disconnect_Banned)
 
 		if err := sess.WritePacket(&a); err != nil {
 			sess.Server.LogError("%v", err)
@@ -215,7 +215,7 @@ func (sess *Session) CanJoin() error {
 		sess.Server.LogDebug("%s is ip banned (%s) IP: %s ", sess.Username, sess.UUID.String(), strings.Split(sess.Conn.RemoteAddr().String(), ":")[1])
 
 		var a packets.LoginDisconnectPacket
-		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_IP_BANNED)))
+		a.Reason = shared.TranslationMessage(shared.Multiplayer_Disconnect_IpBanned)
 
 		if err := sess.WritePacket(&a); err != nil {
 			sess.Server.LogError("%v", err)
@@ -228,7 +228,7 @@ func (sess *Session) CanJoin() error {
 			// if not whitelisted
 
 			var a packets.LoginDisconnectPacket
-			a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_NOT_WHITELISTED)))
+			a.Reason = shared.TranslationMessage(shared.Multiplayer_Disconnect_NotWhitelisted)
 
 			if err := sess.WritePacket(&a); err != nil {
 				sess.Server.LogError("%v", err)
@@ -246,7 +246,7 @@ func (sess *Session) CanJoin() error {
 		}
 
 		var a packets.LoginDisconnectPacket
-		a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_SERVER_FULL)))
+		a.Reason = shared.TranslationMessage(shared.Multiplayer_Disconnect_ServerFull)
 
 		if err := sess.WritePacket(&a); err != nil {
 			sess.Server.LogError("%v", err)
@@ -259,9 +259,9 @@ func (sess *Session) CanJoin() error {
 		if exists {
 			var a packets.LoginDisconnectPacket
 			if sess.Server.MinecraftConfig.Proprieties.OnlineMode {
-				a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_DUPLICATE_LOGIN)))
+				a.Reason = shared.TranslationMessage(shared.Multiplayer_Disconnect_DuplicateLogin)
 			} else {
-				a.Reason = json.RawMessage([]byte(fmt.Sprintf(`{"translate":"%s"}`, shared.MULTIPLAYER_DISCONNECT_NAME_TAKEN)))
+				a.Reason = shared.TranslationMessage(shared.Multiplayer_Disconnect_NameTaken)
 			}
 
 			if err := sess.WritePacket(&a); err != nil {
