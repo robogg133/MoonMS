@@ -54,20 +54,32 @@ func extract(releaseName *string) (dataDir string) {
 	defer reader.Close()
 
 	prefixDir := "minecraft_core_datapack"
+	langPrefix := "minecraft_lang_codes"
 	os.Mkdir(prefixDir, 0777)
 
+	coreDatapackTrigger := filepath.Join("data", "minecraft")
+	langCodesTrigger := filepath.Join("assets", "minecraft", "lang")
 	for _, f := range reader.File {
-		if !strings.HasPrefix(f.Name, "data/minecraft") {
-			continue
-		}
-		f.Name = strings.TrimPrefix(f.Name, "data/minecraft")
-		if f.Mode().IsDir() {
-			os.MkdirAll(filepath.Join(prefixDir, f.Name), 0777)
+		var currentPrefix, currentTrigger string
+
+		if strings.HasPrefix(f.Name, coreDatapackTrigger) {
+			currentTrigger = coreDatapackTrigger
+			currentPrefix = prefixDir
+		} else if strings.HasPrefix(f.Name, langCodesTrigger) {
+			currentTrigger = langCodesTrigger
+			currentPrefix = langPrefix
+		} else {
 			continue
 		}
 
-		os.MkdirAll(filepath.Join(prefixDir, filepath.Dir(f.Name)), 0777)
-		tf, err := os.OpenFile(filepath.Join(prefixDir, f.Name), os.O_CREATE|os.O_WRONLY, 0777)
+		f.Name = strings.TrimPrefix(f.Name, currentTrigger)
+		if f.Mode().IsDir() {
+			os.MkdirAll(filepath.Join(currentPrefix, f.Name), 0777)
+			continue
+		}
+
+		os.MkdirAll(filepath.Join(currentPrefix, filepath.Dir(f.Name)), 0777)
+		tf, err := os.OpenFile(filepath.Join(currentPrefix, f.Name), os.O_CREATE|os.O_WRONLY, 0777)
 		if err != nil {
 			panic(err)
 		}
