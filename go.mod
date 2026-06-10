@@ -13,7 +13,6 @@ require (
 require (
 	github.com/dgraph-io/badger/v4 v4.9.1
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
-	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 )
 
