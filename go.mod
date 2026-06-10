@@ -7,13 +7,13 @@ require github.com/pelletier/go-toml/v2 v2.2.4
 require (
 	github.com/Tnze/go-mc v1.20.3-0.20241224032005-539b4a3a7f03
 	github.com/google/uuid v1.6.0
-	github.com/tetratelabs/wazero v1.11.0
 	golang.org/x/sys v0.38.0
 )
 
 require (
 	github.com/dgraph-io/badger/v4 v4.9.1
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
+	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 )
 
@@ -21,7 +21,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.2.0 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
-	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
