@@ -142,3 +142,20 @@ func UnmarshalPacket(r *Reader, t int32, packetRegistry KnownPackets) (Packet, e
 
 	return pkt, nil
 }
+
+func UnmarshalAs[T Packet](r *Reader, t int32, packetRegistry KnownPackets) (T, error) {
+
+	pkt, err := UnmarshalPacket(r, t, packetRegistry)
+	if err != nil {
+		var null T
+		return null, err
+	}
+
+	typed, ok := pkt.(T)
+	if !ok {
+		var null T
+		return null, fmt.Errorf("unmarshal: expected %T, got %T", typed, pkt)
+	}
+
+	return typed, nil
+}

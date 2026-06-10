@@ -94,3 +94,7 @@ func (s *Session) WritePacket(p packets.Packet) error {
 func (s *Session) ReadPacket() (packets.Packet, error) {
 	return packets.UnmarshalPacket(s.PkgReader, s.Threshold, s.KnownPkgs)
 }
+
+func ReadPacketFromSession[T packets.Packet](sess *Session) (T, error) {
+	return packets.UnmarshalAs[T](sess.PkgReader, sess.Threshold, sess.KnownPkgs)
+}
