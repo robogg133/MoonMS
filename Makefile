@@ -3,8 +3,6 @@ GOARCH ?=""
 
 CURRENT_COMMIT = $(shell git rev-parse HEAD)
 
-
-
 build:
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) \
 	go build .
