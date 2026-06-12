@@ -1,0 +1,4 @@
+*.md 
+.goreleaser.yml
+.gitignore
+.git/
