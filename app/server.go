@@ -102,17 +102,6 @@ func (s *Server) Start() {
 	}
 
 	s.LogInfo("Starting database...")
-	wrapper := NewBadgerLogWrapper(s)
-
-	opt := badger.DefaultOptions(s.Config.DatabaseFolder)
-	opt.Logger = wrapper
-
-	db, err := badger.Open(opt)
-	if err != nil {
-		panic(err)
-	}
-
-	s.database = db
 
 	s.InitPlugins()
 
