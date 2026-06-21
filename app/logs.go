@@ -114,7 +114,10 @@ func (s *Server) compressLog() error {
 	}
 	defer f.Close()
 
-	writer := gzip.NewWriter(f)
+	writer, err := gzip.NewWriterLevel(f, s.MinecraftConfig.Proprieties.LogCompressionLevel)
+	if err != nil {
+		return err
+	}
 
 	_, err = io.Copy(writer, oldLog)
 	if err != nil {

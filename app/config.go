@@ -1,6 +1,7 @@
 package app
 
 import (
+	"compress/gzip"
 	"os"
 	"path/filepath"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-const MAIN_CONFIG_FILE_PATH string = "server-config.toml"
+const MAIN_CONFIG_FILE_PATH string = "config/server-config.toml"
 
 const (
 	GAMEMODE_SURVIVAL  = "survival"
@@ -54,6 +55,8 @@ type MinecraftServerConfig struct {
 		TPS float32 `toml:"tps"`
 
 		Whitelist bool `toml:"whitelist"`
+
+		LogCompressionLevel int `toml:"log-compression-level" comment:"best compression level: 9, default: -1, best speed: 1"`
 	} `toml:"Proprieties"`
 
 	Advanced struct {
@@ -103,38 +106,40 @@ func getDefaultCfgFile() MinecraftServerConfig {
 
 	return MinecraftServerConfig{
 		Proprieties: struct {
-			Motd               string  "toml:\"motd\""
-			Difficulty         string  "toml:\"difficulty\""
-			Gamemode           string  "toml:\"default-gamemode\""
-			ForceGamemode      bool    "toml:\"force-gamemode\""
-			LevelName          string  "toml:\"level-name\" "
-			Seed               int64   "toml:\"level-seed\""
-			Hardcore           bool    "toml:\"hardcore\""
-			MaxPlayer          uint32  "toml:\"max-players\""
-			OnlineMode         bool    "toml:\"online-mode\""
-			AllowServerList    bool    "toml:\"allow-server-list\""
-			ServerIcon         string  "toml:\"sever-icon-path\""
-			ServerPort         uint16  "toml:\"server-port\""
-			ViewDistance       uint8   "toml:\"view-distance\""
-			SimluationDistance uint8   "toml:\"simulation-distance\""
-			TPS                float32 "toml:\"tps\""
-			Whitelist          bool    "toml:\"whitelist\""
+			Motd                string  "toml:\"motd\""
+			Difficulty          string  "toml:\"difficulty\""
+			Gamemode            string  "toml:\"default-gamemode\""
+			ForceGamemode       bool    "toml:\"force-gamemode\""
+			LevelName           string  "toml:\"level-name\" "
+			Seed                int64   "toml:\"level-seed\""
+			Hardcore            bool    "toml:\"hardcore\""
+			MaxPlayer           uint32  "toml:\"max-players\""
+			OnlineMode          bool    "toml:\"online-mode\""
+			AllowServerList     bool    "toml:\"allow-server-list\""
+			ServerIcon          string  "toml:\"sever-icon-path\""
+			ServerPort          uint16  "toml:\"server-port\""
+			ViewDistance        uint8   "toml:\"view-distance\""
+			SimluationDistance  uint8   "toml:\"simulation-distance\""
+			TPS                 float32 "toml:\"tps\""
+			Whitelist           bool    "toml:\"whitelist\""
+			LogCompressionLevel int     "toml:\"log-compression-level\" comment:\"best compression level: 9, default: -1, best speed: 1\""
 		}{
-			Motd:               DEFAULT_MOTD,
-			Difficulty:         DIFFICULTY_EASY,
-			Gamemode:           GAMEMODE_SURVIVAL,
-			ForceGamemode:      false,
-			LevelName:          "world",
-			Seed:               seed.GenerateSeed(),
-			Hardcore:           false,
-			MaxPlayer:          20,
-			OnlineMode:         true,
-			AllowServerList:    true,
-			ServerPort:         25565,
-			ViewDistance:       10,
-			SimluationDistance: 16,
-			TPS:                20.0,
-			Whitelist:          false,
+			Motd:                DEFAULT_MOTD,
+			Difficulty:          DIFFICULTY_EASY,
+			Gamemode:            GAMEMODE_SURVIVAL,
+			ForceGamemode:       false,
+			LevelName:           "world",
+			Seed:                seed.GenerateSeed(),
+			Hardcore:            false,
+			MaxPlayer:           20,
+			OnlineMode:          true,
+			AllowServerList:     true,
+			ServerPort:          25565,
+			ViewDistance:        10,
+			SimluationDistance:  16,
+			TPS:                 20.0,
+			Whitelist:           false,
+			LogCompressionLevel: gzip.DefaultCompression,
 		},
 		Advanced: struct {
 			OfflineEncryption bool  "toml:\"offline-encryption\""
