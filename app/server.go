@@ -139,11 +139,7 @@ func (s *Server) Stop() error {
 		}
 	}
 
-	s.LogInfo("Closing database...")
-
-	err := s.database.Close()
-
-	return err
+	return nil
 }
 
 func (s *Server) IsWhitelisted(plr string) bool {
