@@ -14,7 +14,7 @@ RUN go build -ldflags="-s -w" -trimpath -buildvcs=false -o MoonMS .
 FROM codebase AS healthcheck
 WORKDIR /app
 
-RUN go build -ldflags="-s -w" -trimpath -buildvcs=false -o healthcheck ./cmd/healthcheck
+RUN go build -ldflags="-s -w" -trimpath -buildvcs=false -o healthcheck ./tools/healthcheck
 
 
 FROM alpine:3.23 AS certs
