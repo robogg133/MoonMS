@@ -40,7 +40,7 @@ func main() {
 		DatabaseFolder: "data/database",
 	}
 
-	if os.Getenv("DEBUG") == "true" {
+	if os.Getenv("DEBUG") == "1" {
 		scfg.DebugEnabled = true
 	}
 
