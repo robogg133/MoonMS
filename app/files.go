@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/robogg133/MoonMS/internal/shared/plataforms"
 )
 
 const (
@@ -106,11 +108,16 @@ func (s *Server) basicFiles() error {
 
 	s.LogDebug("created whitelist file")
 
-	if err := os.MkdirAll(s.Config.PluginsFolder, 0777); err != nil {
+	if err := os.MkdirAll(s.Config.PluginsFolder, 0755); err != nil {
 		return err
 	}
 
 	s.LogDebug("created plugins folder")
+
+	if err := os.MkdirAll(s.Config.ObjectsFolder, 0755); err != nil {
+		return err
+	}
+	plataforms.SetHidden(s.Config.ObjectsFolder)
 
 	return nil
 }

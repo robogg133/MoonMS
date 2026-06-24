@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"fmt"
 	"io"
 
 	"go.yaml.in/yaml/v4"
@@ -15,6 +16,7 @@ type Dependencie struct {
 
 type Manifest struct {
 	Identifier  string `yaml:"identifier"`
+	PluginKind  string `yaml:"kind"`
 	Name        string `yaml:"name"`
 	Version     string `yaml:"version"`
 	Homepage    string `yaml:"home-page"`
@@ -23,20 +25,16 @@ type Manifest struct {
 
 	MCVersion string `yaml:"mc-version"`
 
-	Objects []string `yaml:"objects"`
-
 	Require  []Dependencie `yaml:"require"`
 	Provides []Dependencie `yaml:"provides"`
 }
 
-func ReadManifest(r io.Reader) Manifest {
-	decoder := yaml.NewDecoder(r)
-
-	var m Manifest
-
-	if err := decoder.Decode(&m); err != nil {
-		panic(err)
+func (m *Manifest) decode(r io.Reader) error {
+	if err := yaml.NewDecoder(r).Decode(&m); err != nil {
+		return err
 	}
-
-	return m
+	if !validIdentifier(m.Identifier) {
+		return fmt.Errorf("Invalid identifier: can only be alphanumeric and have _")
+	}
+	return nil
 }

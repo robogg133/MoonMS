@@ -13,11 +13,11 @@ import (
 
 var ErrSameIdentifier = errors.New("plugins with the same identifier, please check your plugins")
 
-func (s *Server) InitPlugins() {
+func (s *Server) InitPlugins() error {
 
 	allDirFiles, err := os.ReadDir(s.Config.PluginsFolder)
 	if err != nil {
-		s.LogError("%v", err)
+		return err
 	}
 	plugin.SetPluginsFolder(s.Config.PluginsFolder)
 
@@ -33,12 +33,16 @@ func (s *Server) InitPlugins() {
 		path := filepath.Join(s.Config.PluginsFolder, d.Name())
 
 		w := s.NewPluginWriter("")
-		pl := plugin.NewPlugin(path, w)
+		pl, err := plugin.PreparePlugin(path, filepath.Join(s.Config.ObjectsFolder, "zip_digests.json"))
+		if err != nil {
+			s.LogError("Preparing plugin: %s", err)
+			continue
+		}
 
 		w.SetName(pl.Meta.Name)
 
 		if pl.Meta.MCVersion != s.MinecraftConfig.MinecraftVersion {
-			s.LogError("(plugin:%s) Mismatched version between server and plugin. Plugin version: %s, Server version: %s. Remove this plugin or try checking if it has received an update. Plugin homepage: \"%s\"", pl.ID, pl.Meta.MCVersion, s.MinecraftConfig.MinecraftVersion, pl.Meta.Homepage)
+			s.LogError("(plugin:%s) Mismatched version between server and plugin. Plugin version: %s, Server version: %s. Remove this plugin or try checking if it has received an update. Plugin homepage: \"%s\"", pl.Meta.Identifier, pl.Meta.MCVersion, s.MinecraftConfig.MinecraftVersion, pl.Meta.Homepage)
 			continue
 		}
 
@@ -62,15 +66,15 @@ func (s *Server) InitPlugins() {
 			panic(ErrSameIdentifier)
 		}
 
-		s.Plugins[pl.ID] = &pl
+		s.Plugins[pl.ID] = pl
 
-		s.loadWrapper(&pl, &wg)
+		s.loadWrapper(pl, &wg)
 	}
 
 	wg.Wait()
 
 	s.LogInfo("The server took %dms to load all plugins!", time.Since(allPlgStart).Milliseconds())
-
+	return nil
 }
 
 func (s *Server) loadWrapper(plg *plugin.Plugin, wg *sync.WaitGroup) {

@@ -44,6 +44,9 @@ var (
 
 func (s *Session) Run() error {
 	for {
+		if _, err := s.Conn.Read([]byte{}); err != nil {
+			return nil
+		}
 		if err := s.State.Handle(s); err != nil {
 			switch err {
 			case ErrNoReason:

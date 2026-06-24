@@ -27,6 +27,10 @@ func main() {
 	if err := cfg.ConfigFile(); err != nil {
 		panic(err)
 	}
+	dbcfg := app.DatabaseConfig{}
+	if err := dbcfg.ConfigFile(); err != nil {
+		panic(err)
+	}
 
 	cfg.MinecraftVersion = "26.2"
 	cfg.ProtcolVersion = 776
@@ -38,6 +42,7 @@ func main() {
 		PluginsFolder:  "plugins",
 		AcessFolder:    "data/access",
 		DatabaseFolder: "data/database",
+		ObjectsFolder:  "data/.objects",
 	}
 
 	if os.Getenv("DEBUG") == "1" {
@@ -53,6 +58,7 @@ func main() {
 	if err := server.StartLogger(); err != nil {
 		panic(err)
 	}
+	server.DatabaseConfig = dbcfg
 
 	go func() {
 		sig := make(chan os.Signal, 1)

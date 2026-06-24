@@ -2,14 +2,14 @@ package plugin
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"time"
-
-	"github.com/robogg133/MoonMS/internal/shared/plataforms"
 )
 
 type State uint8
@@ -43,93 +43,142 @@ type Runtime interface {
 
 const (
 	StateLoaded State = iota
+	StatePrepared
 	StateEnabled
 	StateDisabled
 	StateCrashed
 )
 
-func NewPlugin(path string, logWriter io.Writer) Plugin {
-	var pl Plugin
-
-	reader, err := zip.OpenReader(path)
+func consultZipOkAndUpdate(jsonFile, identifier, srcPath string) (bool, error) {
+	f, err := os.Open(srcPath)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
-	f, err := reader.Open(MANIFEST_FILE_NAME)
-	if err != nil {
-		panic(err)
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		f.Close()
+		return false, err
 	}
-	pl.Meta = ReadManifest(f)
+	digest := hex.EncodeToString(h.Sum(nil))
+	f.Close()
 
-	pl.MyFolder = filepath.Join(pluginsFolder, pl.Meta.Name)
+	jsonData := make(map[string]string)
 
-	pl.ID = pl.Meta.Identifier
+	jf, err := os.OpenFile(jsonFile, os.O_CREATE|os.O_RDWR, 0755)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		defer jf.Close()
+		if _, err := jf.Seek(0, io.SeekStart); err != nil {
+			panic(err)
+		}
 
-	if _, err = os.Stat(pl.MyFolder); err == nil {
-		for _, v := range reader.File {
-			if slices.Contains(pl.Meta.Objects, v.Name) {
-				pl.copyWithPrefix(v, ".objects")
+		jsonData[identifier] = digest
+		if err := json.NewEncoder(jf).Encode(jsonData); err != nil {
+			panic(err)
+		}
+	}()
+
+	if err := json.NewDecoder(jf).Decode(&jsonData); err != nil {
+		return false, err
+	}
+
+	if s, ok := jsonData[identifier]; ok && s == digest {
+		return true, nil
+	}
+	return false, nil
+}
+
+func parseManifest(path string) (Manifest, error) {
+	var m Manifest
+
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return Manifest{}, err
+	}
+	defer r.Close()
+
+	f, err := r.Open(MANIFEST_FILE_NAME)
+	if err != nil {
+		return Manifest{}, err
+	}
+	defer f.Close()
+
+	if err := m.decode(f); err != nil {
+		return Manifest{}, err
+	}
+
+	return m, nil
+}
+
+func PreparePlugin(path string, pluginsShaFile string) (*Plugin, error) {
+
+	m, err := parseManifest(path)
+	if err != nil {
+		if err.Error() == zip.ErrFormat.Error() {
+			return nil, fmt.Errorf("invalid file: %s on plugins folder NOT a plugin!", path)
+		}
+		return nil, err
+	}
+
+	ok, err := consultZipOkAndUpdate(pluginsShaFile, m.Identifier, path)
+	if err != nil {
+		return nil, err
+	}
+	destDir := filepath.Join(filepath.Dir(pluginsShaFile), "plg!!"+m.Identifier)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return nil, err
+	}
+	if !ok {
+		reader, err := zip.OpenReader(path)
+		if err != nil {
+			reader.Close()
+			return nil, err
+		}
+
+		for _, fd := range reader.File {
+			if fd.Name == MANIFEST_FILE_NAME {
+				continue
+			}
+			if err := copyWithPrefix(fd, destDir); err != nil {
+				reader.Close()
+				return nil, err
 			}
 		}
-		pl.initRuntime(logWriter)
-		return pl
+		reader.Close()
 	}
-	pl.mkdirPluginFolderStructure()
-
-	for _, v := range reader.File {
-		if slices.Contains(pl.Meta.Objects, v.Name) {
-			pl.copyWithPrefix(v, ".objects")
-		}
-		var found bool
-		if v.Name, found = strings.CutPrefix(v.Name, "data/"); found {
-			pl.copyWithPrefix(v, ".data")
-		}
+	pl := &Plugin{
+		Meta:     m,
+		State:    StatePrepared,
+		MyFolder: destDir,
 	}
-
-	pl.initRuntime(logWriter)
-
-	return pl
+	return pl, nil
 }
 
-func (pl *Plugin) mkdirPluginFolderStructure() {
-	if err := os.MkdirAll(pl.MyFolder, 0755); err != nil {
-		panic(err)
-	}
-
-	if err := os.Mkdir(filepath.Join(pl.MyFolder, ".objects"), 0755); err != nil {
-		panic(err)
-	}
-	plataforms.SetHidden(filepath.Join(pl.MyFolder, ".objects"))
-
-	if err := os.Mkdir(filepath.Join(pl.MyFolder, ".data"), 0755); err != nil {
-		panic(err)
-	}
-	plataforms.SetHidden(filepath.Join(pl.MyFolder, ".data"))
-
-}
-
-func (pl *Plugin) copyWithPrefix(v *zip.File, prefix string) {
+func copyWithPrefix(v *zip.File, prefix string) error {
 	if v.FileInfo().IsDir() {
-		err := os.MkdirAll(filepath.Join(filepath.Join(pl.MyFolder, prefix, v.Name)), 0755)
+		err := os.MkdirAll(filepath.Join(filepath.Join(prefix, v.Name)), 0755)
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 
 	sF, err := v.Open()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	tF, err := os.Create(filepath.Join(pl.MyFolder, prefix, v.Name))
+	defer sF.Close()
+	tF, err := os.Create(filepath.Join(prefix, v.Name))
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if _, err := io.Copy(tF, sF); err != nil {
-		panic(err)
+		return err
 	}
-
+	return nil
 }
 
 func (pl *Plugin) initRuntime(logWriter io.Writer) {

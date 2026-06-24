@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"runtime/debug"
 	"sync"
 
@@ -15,21 +16,20 @@ import (
 
 type Server struct {
 	MinecraftConfig MinecraftServerConfig
+	DatabaseConfig  DatabaseConfig
+	database        *badger.DB
 
 	logFile io.Writer
 
 	Config Config
 
 	Plugins       map[string]*plugin.Plugin
+	PlayerList    []packets.PlayerListInfo
 	OnlinePlayers uint32
-
-	PlayerList []packets.PlayerListInfo
 
 	Sessions map[string]*Session
 
 	ServerPrivateKey *rsa.PrivateKey
-
-	database *badger.DB
 
 	op struct {
 		lock  sync.RWMutex
@@ -84,6 +84,7 @@ type Config struct {
 	AcessFolder    string
 	PluginsFolder  string
 	DatabaseFolder string
+	ObjectsFolder  string
 }
 
 func (s *Server) Start() {
@@ -101,7 +102,26 @@ func (s *Server) Start() {
 		panic(err)
 	}
 
-	s.LogInfo("Starting database...")
+	if s.DatabaseConfig.Active {
+		s.LogInfo("Starting database...")
+		opts := badger.DefaultOptions(s.Config.DatabaseFolder).
+			WithLogger(NewBadgerLogWrapper(s)).
+			WithSyncWrites(s.DatabaseConfig.SyncWrites).
+			WithValueThreshold(1024).
+			WithCompression(compressionType(s.DatabaseConfig.Compression)).
+			WithNumCompactors(runtime.NumCPU()).
+			WithNumLevelZeroTables(10).
+			WithMemTableSize(s.DatabaseConfig.MemTable).
+			WithBlockCacheSize(s.DatabaseConfig.BlockCache).
+			WithValueLogFileSize(s.DatabaseConfig.ValueLog).
+			WithNumLevelZeroTablesStall(20)
+		db, err := badger.Open(opts)
+		if err != nil {
+			panic(err)
+		}
+		s.database = db
+		go dbGC(s.database, s.DatabaseConfig.GCInterval, s.DatabaseConfig.GCDiscard)
+	}
 
 	s.InitPlugins()
 
@@ -135,6 +155,13 @@ func (s *Server) Stop() error {
 		s.LogDebug("sending stop signal to plugin:%s ", id)
 
 		if err := plg.Runtime.Call("server_stopping_event"); err != nil {
+			return err
+		}
+	}
+
+	if s.database != nil {
+		s.LogInfo("Closing database...")
+		if err := s.database.Close(); err != nil {
 			return err
 		}
 	}

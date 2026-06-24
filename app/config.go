@@ -4,13 +4,18 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/dgraph-io/badger/v4/options"
 	"github.com/robogg133/MoonMS/pkg/minecraft/world/seed"
 
 	"github.com/pelletier/go-toml/v2"
 )
 
-const MAIN_CONFIG_FILE_PATH string = "config/server-config.toml"
+const (
+	MainConfigFilePath     string = "configs/server-config.toml"
+	DatabaseConfigFilePath string = "configs/database-config.toml"
+)
 
 const (
 	GAMEMODE_SURVIVAL  = "survival"
@@ -25,7 +30,24 @@ const (
 	DIFFICULTY_HARD   = "hard"
 )
 
+const (
+	CompressionSnappy string = "snappy"
+	CompressionZSTD   string = "zstd"
+	CompressionNone   string = "none"
+)
+
 const DEFAULT_MOTD string = "A Minecraft server"
+
+type DatabaseConfig struct {
+	Active      bool          `toml:"active"`
+	MemTable    int64         `toml:"mem_table"`
+	BlockCache  int64         `toml:"block_cache"`
+	ValueLog    int64         `toml:"value_log"`
+	Compression string        `toml:"compression"`
+	SyncWrites  bool          `toml:"sync_writes"`
+	GCInterval  time.Duration `toml:"gc_interval"`
+	GCDiscard   float64       `toml:"gc_discard"`
+}
 
 type MinecraftServerConfig struct {
 	Proprieties struct {
@@ -65,6 +87,7 @@ type MinecraftServerConfig struct {
 		RSAKeyBitAmmount uint  `toml:"rsa-key-bit-ammount"`
 		Threshold        int32 `toml:"threshold"`
 	} `toml:"Advanced"`
+
 	ProtcolVersion int32 `toml:",omitempty"`
 
 	MinecraftVersion string `toml:",omitempty"`
@@ -72,12 +95,12 @@ type MinecraftServerConfig struct {
 
 func (cfg *MinecraftServerConfig) ConfigFile() error {
 readAgain:
-	b, err := os.ReadFile(MAIN_CONFIG_FILE_PATH)
+	b, err := os.ReadFile(MainConfigFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 
-			_ = os.MkdirAll(filepath.Dir(MAIN_CONFIG_FILE_PATH), 0755)
-			f, err := os.Create(MAIN_CONFIG_FILE_PATH)
+			_ = os.MkdirAll(filepath.Dir(MainConfigFilePath), 0755)
+			f, err := os.Create(MainConfigFilePath)
 			if err != nil {
 				return err
 			}
@@ -100,6 +123,60 @@ readAgain:
 	}
 
 	return nil
+}
+
+func (cfg *DatabaseConfig) ConfigFile() error {
+readAgain:
+	b, err := os.ReadFile(DatabaseConfigFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+
+			_ = os.MkdirAll(filepath.Dir(DatabaseConfigFilePath), 0755)
+			f, err := os.Create(DatabaseConfigFilePath)
+			if err != nil {
+				return err
+			}
+
+			b, err := toml.Marshal(getDefaultCfgFileDB())
+			if err != nil {
+				return err
+			}
+
+			_, err = f.Write(b)
+			if err != nil {
+				return err
+			}
+			goto readAgain
+		}
+		return err
+	}
+	if err := toml.Unmarshal(b, &cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getDefaultCfgFileDB() DatabaseConfig {
+	return DatabaseConfig{
+		Active:      true,
+		MemTable:    64 << 20,
+		BlockCache:  32 << 20,
+		ValueLog:    256 << 20,
+		Compression: CompressionZSTD,
+		SyncWrites:  false,
+		GCInterval:  10 * time.Minute,
+		GCDiscard:   0.5,
+	}
+}
+func compressionType(s string) options.CompressionType {
+	switch s {
+	case CompressionSnappy:
+		return options.Snappy
+	case CompressionZSTD:
+		return options.ZSTD
+	default:
+		return options.None
+	}
 }
 
 func getDefaultCfgFile() MinecraftServerConfig {
